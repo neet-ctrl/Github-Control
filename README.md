@@ -223,6 +223,65 @@ Pre-filled by the in-app guide; documented here for transparency:
 > **Fine-grained tokens** can do everything except `delete_repo`. The in-app
 > guide lists the equivalent repository + account permissions to enable.
 
+## Customising the About screen (developer name, links, contact)
+
+Every "who built this" detail rendered on **About** comes from a single object
+so forks can rebrand without touching the UI:
+
+**File:** `app/src/main/java/com/githubcontrol/utils/BuildInfo.kt`
+
+| Constant | Line | Used by | What to change it for |
+|----------|------|---------|----------------------|
+| `VERSION_NAME` | 10 | Header card, `SettingsBackup.appVersion` | Public version label (`v1.0.0`) |
+| `VERSION_CODE` | 11 | About → Technical info | Internal monotonic build number |
+| `GITHUB_OWNER` | 14 | `UpdateChecker`, About "Visit GitHub" button, `REPO_URL`, `ISSUES_URL` | The GitHub login that owns the repo + ships releases |
+| `GITHUB_REPO`  | 15 | Same as above | The repository name on github.com |
+| `ISSUES_URL`   | 16 | About → "Report an Issue" + footer "Report a bug" | Pre-built `…/issues/new` URL — derived, edit only if you host issues elsewhere |
+| `REPO_URL`     | 17 | About → "GitHub Repository" link | Repo home URL — derived, see above |
+| `DEVELOPER_NAME`  | 18 | About → Developer card title | Maintainer's display name |
+| `DEVELOPER_EMAIL` | 19 | About → "Email" button | Contact address opened in `mailto:` |
+
+Where these surface in the UI:
+
+- `app/src/main/java/com/githubcontrol/ui/screens/about/AboutScreen.kt`
+  - line **87** — version pill
+  - line **118** — developer name
+  - line **124** — *Visit GitHub* button (`https://github.com/<owner>`)
+  - line **129** — *Email* button (`mailto:<email>`)
+  - lines **139–140** — version + build code rows
+  - lines **147–148** — repo + issues links
+  - line **194** — footer *Report a bug* button
+
+After editing `BuildInfo.kt` no other files need to change — rebuild
+and the About screen, update checker, and settings backup all pick up
+the new values automatically.
+
+## Tuning the uploader
+
+The uploader is the single largest user-facing background system. Knobs and
+extension points:
+
+- **`app/src/main/java/com/githubcontrol/upload/UploadManager.kt`** — the
+  in-process state machine. The `UploadJob` data class (top of file) is what
+  every entrypoint (file picker, sync worker, widget intent) constructs. The
+  `UploadProgress` data class (line 53) is what every observer (Status
+  dashboard, widgets, notifications) renders.
+- **`app/src/main/java/com/githubcontrol/worker/UploadWorker.kt`** — the
+  WorkManager wrapper that runs uploads as a foreground service so Android
+  doesn't kill them when the app is backgrounded.
+- **`app/src/main/java/com/githubcontrol/viewmodel/UploadManagerHolder.kt`**
+  — singleton handle the UI uses to subscribe to live progress.
+- **`app/src/main/java/com/githubcontrol/notifications/Notifier.kt`** — upload
+  + completion notifications. Edit the title/body templates here.
+- **`app/src/main/java/com/githubcontrol/ai/CommitAi.kt`** — the offline
+  heuristic that turns a job into a commit message. Override `suggest(job)` to
+  plug in a different generator.
+
+The uploader writes via the **Git Data API** (atomic blob → tree → commit →
+ref-update) so an interrupted multi-file upload either lands as one commit or
+not at all — there are no half-uploaded states. Conflict handling
+(overwrite / skip / rename) is set per job at construction time.
+
 ## Project layout
 
 ```
@@ -268,3 +327,27 @@ android-app/
 │           ├── widget/         # Home-screen widget provider
 │           └── worker/         # SyncWorker + UploadWorker
 ```
+
+## Recent fixes & improvements
+
+- **Atomic folder delete (FilesScreen).** Swipe-to-delete on a directory in
+  the file tree now opens a commit-message dialog and deletes the entire
+  subtree in a single Git Data API commit (blob → tree → commit → ref-update),
+  not file-by-file. Implemented in
+  `app/src/main/java/com/githubcontrol/viewmodel/FilesViewModel.kt`
+  (`deleteFolder`, `expandPaths`, rewritten `deleteSelected`).
+- **Account switcher actually switches.** Picking an account on the dashboard
+  now broadcasts `MainViewModel.accountSwitched` after the token swap;
+  `AppRoot` listens, navigates to `Dashboard` with `popUpTo(0)` and the new
+  identity's data is reloaded everywhere.
+- **Cold-start route restore is back-button safe.** When restoring the last
+  route on relaunch, `AppRoot` now first pushes `Dashboard` and then the
+  saved deep route, so a 404'd or stale screen no longer traps the back button.
+- **`REPLACE_FOLDER` upload.** Fixed `MissingFieldException` for `GhBlob`
+  fields `[size, content, encoding]` — they are now optional with sane
+  defaults in `Models.kt:460`.
+- **Command Mode catalog.** The terminal now ships a built-in catalog of
+  ~50 commands grouped by category (Repos, Branches, Issues, Pull Requests,
+  Releases, History, Files, Users, Search, Session). Each row has a copy
+  button (puts the template on the clipboard), an info dialog (usage +
+  description + example) and inserts the command into the input on tap.

@@ -454,7 +454,15 @@ data class GhRateLimit(val resources: Map<String, GhRateLimitEntry> = emptyMap()
 data class GhRateLimitEntry(val limit: Int, val remaining: Int, val reset: Long, val used: Int = 0)
 
 @Serializable
-data class GhBlob(val sha: String, val size: Long, val content: String, val encoding: String, val url: String)
+data class GhBlob(
+    val sha: String,
+    val url: String = "",
+    // POST /git/blobs returns only { sha, url }; GET /git/blobs/{sha} returns full body.
+    // Make these optional so deserialization works for both shapes.
+    val size: Long = 0,
+    val content: String = "",
+    val encoding: String = ""
+)
 
 @Serializable
 data class CreateBlobRequest(val content: String, val encoding: String = "base64")

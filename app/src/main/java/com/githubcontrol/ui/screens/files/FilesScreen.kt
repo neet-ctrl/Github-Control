@@ -32,6 +32,7 @@ fun FilesScreen(
     val s by vm.state.collectAsState()
     var showBranches by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf<com.githubcontrol.data.api.GhContent?>(null) }
+    var showFolderDelete by remember { mutableStateOf<com.githubcontrol.data.api.GhContent?>(null) }
     var showRename by remember { mutableStateOf<com.githubcontrol.data.api.GhContent?>(null) }
     var bulkDelete by remember { mutableStateOf(false) }
 
@@ -78,7 +79,10 @@ fun FilesScreen(
                     items(s.items, key = { it.path }) { item ->
                 val selected = s.selection.contains(item.path)
                 SwipeRow(
-                    onDelete = { if (item.type == "file") showDelete = item },
+                    onDelete = {
+                        if (item.type == "file") showDelete = item
+                        else if (item.type == "dir") showFolderDelete = item
+                    },
                     onArchive = { if (item.type == "file") showRename = item },
                     rightLabel = "Delete", leftLabel = "Rename"
                 ) {
@@ -125,6 +129,30 @@ fun FilesScreen(
             text = { OutlinedTextField(msg, { msg = it }, label = { Text("Commit message") }) },
             confirmButton = { TextButton(onClick = { vm.deletePath(item.path, item.sha, msg) { showDelete = null } }) { Text("Delete", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton(onClick = { showDelete = null }) { Text("Cancel") } }
+        )
+    }
+    showFolderDelete?.let { folder ->
+        var msg by remember { mutableStateOf("Delete folder ${folder.path}") }
+        AlertDialog(
+            onDismissRequest = { showFolderDelete = null },
+            title = { Text("Delete folder") },
+            text = {
+                Column {
+                    Text(
+                        "This removes ${folder.path} and every file inside it in a single atomic commit. This cannot be undone from the app.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(msg, { msg = it }, label = { Text("Commit message") })
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.deleteFolder(folder.path, msg) { showFolderDelete = null }
+                }) { Text("Delete folder", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { showFolderDelete = null }) { Text("Cancel") } }
         )
     }
     if (bulkDelete) {

@@ -127,6 +127,40 @@ and ZIP-folder download via the Storage Access Framework.
   `UpdateRepoRequest.defaultBranch`. The default branch is also protected
   from accidental deletion.
 
+## Latest iteration (Apr 2026)
+
+- **Account switcher actually switches** — `MainViewModel.switchAccount`
+  now emits a `accountSwitched: SharedFlow<String>` after calling
+  `accountManager.setActiveAccount(...)` and refreshing dashboard data.
+  `AppRoot` collects that flow and `navigate(Dashboard) { popUpTo(0) }`,
+  so every screen reloads against the new identity instead of showing the
+  previous account's cached view.
+- **Cold-start route restore is back-button safe** — when restoring the
+  saved last route, `AppRoot` now first navigates to `Dashboard` (anchor)
+  and *then* pushes the deep route. Pressing back from a stale or 404'd
+  screen always lands on the dashboard instead of dead-ending.
+- **`GhBlob` deserialization fix** — `data/api/Models.kt:460` now declares
+  `size`, `content`, `encoding` as optional with defaults so the response
+  to `gitTree(recursive=1)` no longer trips kotlinx.serialization
+  `MissingFieldException` during `REPLACE_FOLDER` runs.
+- **Folder delete from Files** — `FilesViewModel.deleteFolder()` and the
+  rewritten `deleteSelected()` walk the tree, expand any selected
+  directories into their child paths, and issue a single atomic
+  `commitFiles` with deletes (Git Data API). `FilesScreen` swipe-deletes
+  on a directory open a commit-message dialog (`showFolderDelete` state).
+- **Command Mode catalog** — `CommandViewModel.catalog` is the new source
+  of truth for the in-app shell, with `~50` `CommandSpec(name, template,
+  category, description, example)` rows grouped by category. The shell
+  implementation in `execute(...)` and the `helpText()` output both
+  derive from this list. `CommandScreen` now renders the catalog above
+  the terminal with copy + info buttons per row, plus a search filter.
+- **About-screen branding source of truth** — every "who built this" value
+  rendered on About lives in `app/src/main/java/com/githubcontrol/utils/BuildInfo.kt`
+  (`DEVELOPER_NAME`, `DEVELOPER_EMAIL`, `GITHUB_OWNER`, `GITHUB_REPO`,
+  `REPO_URL`, `ISSUES_URL`). Forks change this single file and the About
+  screen, update checker and settings backup all pick up the new values.
+  See README "Customising the About screen" for the per-line breakdown.
+
 ## Building the APK
 The Replit container can NOT compile Android. Use the GitHub Actions workflow
 (`.github/workflows/android.yml`) which runs `gradlew assembleDebug` on Ubuntu

@@ -99,15 +99,66 @@ class FilesViewModel @Inject constructor(private val repo: GitHubRepository) : V
 
     fun deleteSelected(message: String, onDone: () -> Unit) {
         val s = _state.value
-        val selected = s.items.filter { s.selection.contains(it.path) && it.type == "file" }
+        val selectedItems = s.items.filter { s.selection.contains(it.path) }
+        if (selectedItems.isEmpty()) { onDone(); return }
         viewModelScope.launch {
             try {
-                for (it in selected) {
-                    repo.api.deleteFile(s.owner, s.name, it.path, DeleteFileRequest(message, it.sha, s.ref.ifBlank { null }))
-                }
+                // Expand any folders so directory selection wipes their full subtree
+                // in a single atomic Git Data API commit.
+                val paths = expandPaths(s.owner, s.name, s.ref, selectedItems)
+                val ops: List<Pair<String, ByteArray?>> = paths.map { it to null }
+                repo.commitFiles(s.owner, s.name, s.ref.ifBlank { "HEAD" }, ops, message, null, null)
                 clearSelection()
                 load(s.owner, s.name, s.path, s.ref); onDone()
             } catch (t: Throwable) { _state.value = _state.value.copy(error = t.message) }
         }
+    }
+
+    /**
+     * Delete a folder and everything inside it as one atomic commit.
+     * GitHub has no "delete folder" REST endpoint — we have to enumerate the
+     * folder via the Git Tree API and emit a tree commit that removes every
+     * blob under that path.
+     */
+    fun deleteFolder(folderPath: String, message: String, onDone: () -> Unit) {
+        val s = _state.value
+        viewModelScope.launch {
+            try {
+                val branchName = s.ref.ifBlank { "HEAD" }
+                val branchInfo = repo.api.branch(s.owner, s.name, branchName)
+                val parent = repo.api.commitDetail(s.owner, s.name, branchInfo.commit.sha)
+                val ft = repo.api.gitTree(s.owner, s.name, parent.commit.tree.sha, recursive = 1)
+                val prefix = folderPath.trim('/') + "/"
+                val toDelete = ft.tree
+                    .filter { it.type == "blob" && it.path.startsWith(prefix) }
+                    .map { it.path }
+                if (toDelete.isEmpty()) {
+                    _state.value = _state.value.copy(error = "Folder is empty or already deleted")
+                    onDone(); return@launch
+                }
+                val ops: List<Pair<String, ByteArray?>> = toDelete.map { it to null }
+                repo.commitFiles(s.owner, s.name, branchName, ops, message, null, null)
+                load(s.owner, s.name, s.path, s.ref); onDone()
+            } catch (t: Throwable) { _state.value = _state.value.copy(error = t.message) }
+        }
+    }
+
+    /**
+     * Resolve a mixed selection of files + directories into a flat list of
+     * blob paths (so a single tree commit can delete everything atomically).
+     */
+    private suspend fun expandPaths(
+        owner: String, name: String, ref: String, items: List<GhContent>
+    ): List<String> {
+        val files = items.filter { it.type == "file" }.map { it.path }
+        val dirs = items.filter { it.type == "dir" }
+        if (dirs.isEmpty()) return files
+        val branchInfo = repo.api.branch(owner, name, ref.ifBlank { "HEAD" })
+        val parent = repo.api.commitDetail(owner, name, branchInfo.commit.sha)
+        val ft = repo.api.gitTree(owner, name, parent.commit.tree.sha, recursive = 1)
+        val dirPaths = dirs.map { it.path.trim('/') + "/" }
+        val nested = ft.tree.filter { it.type == "blob" && dirPaths.any { p -> it.path.startsWith(p) } }
+            .map { it.path }
+        return (files + nested).distinct()
     }
 }

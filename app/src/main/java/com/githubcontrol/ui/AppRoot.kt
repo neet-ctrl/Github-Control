@@ -89,7 +89,26 @@ fun AppRoot() {
             }
             val current = nav.currentDestination?.route
             if (current != target && current?.substringBefore('/') != target.substringBefore('/')) {
-                nav.navigate(target) { popUpTo(0) { inclusive = true } }
+                if (target != Routes.DASHBOARD &&
+                    target !in setOf(Routes.LOGIN, Routes.BIOMETRIC, Routes.ONBOARDING)
+                ) {
+                    // Restoring a deep route on cold-start: anchor the back stack
+                    // to Dashboard first so the system back button always works
+                    // (and so 404s on a stale lastRoute don't trap the user).
+                    nav.navigate(Routes.DASHBOARD) { popUpTo(0) { inclusive = true } }
+                    nav.navigate(target)
+                } else {
+                    nav.navigate(target) { popUpTo(0) { inclusive = true } }
+                }
+            }
+        }
+
+        // When the active account changes, every screen's data was loaded under
+        // the previous token. Reset the back stack to a fresh Dashboard so all
+        // ViewModels are recreated and reload using the new account.
+        LaunchedEffect(nav) {
+            main.accountSwitched.collect {
+                nav.navigate(Routes.DASHBOARD) { popUpTo(0) { inclusive = true } }
             }
         }
 

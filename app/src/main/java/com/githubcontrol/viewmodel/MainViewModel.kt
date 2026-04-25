@@ -10,8 +10,11 @@ import com.githubcontrol.data.auth.TokenValidator
 import com.githubcontrol.data.repository.GitHubRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -44,6 +47,15 @@ class MainViewModel @Inject constructor(
 
     private val _addingAccount = MutableStateFlow(false)
     val addingAccount: StateFlow<Boolean> = _addingAccount.asStateFlow()
+
+    /**
+     * Emitted whenever the active account is switched. AppRoot listens to this
+     * and re-anchors the nav back stack to the Dashboard so every screen's
+     * ViewModel is recreated and reloads using the new account's token —
+     * otherwise screens keep showing data cached from the previous account.
+     */
+    private val _accountSwitched = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val accountSwitched: SharedFlow<String> = _accountSwitched.asSharedFlow()
 
     fun beginAddAccount() { _addingAccount.value = true }
     fun endAddAccount() { _addingAccount.value = false }
@@ -125,6 +137,9 @@ class MainViewModel @Inject constructor(
             accountManager.setActive(id)
             sessionGate.unlock()
             refresh()
+            // Notify AppRoot so it can clear the back stack & reload screens
+            // under the newly-active token.
+            _accountSwitched.tryEmit(id)
         }
     }
 
