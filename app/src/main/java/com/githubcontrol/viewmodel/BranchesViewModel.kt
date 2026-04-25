@@ -14,10 +14,12 @@ import javax.inject.Inject
 data class BranchesState(
     val loading: Boolean = false,
     val items: List<GhBranch> = emptyList(),
+    val defaultBranch: String = "",
     val message: String? = null,
     val error: String? = null,
     val renaming: String? = null,
     val deleting: String? = null,
+    val settingDefault: String? = null,
 )
 
 @HiltViewModel
@@ -33,10 +35,33 @@ class BranchesViewModel @Inject constructor(private val repo: GitHubRepository) 
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
             try {
-                _state.value = _state.value.copy(loading = false, items = repo.branches(owner, name))
+                val items = repo.branches(owner, name)
+                val def = runCatching { repo.repo(owner, name).defaultBranch }.getOrNull().orEmpty()
+                _state.value = _state.value.copy(loading = false, items = items, defaultBranch = def)
             } catch (t: Throwable) {
                 _state.value = _state.value.copy(loading = false, error = friendly(t, "load branches"))
             }
+        }
+    }
+
+    fun setDefault(owner: String, name: String, branch: String) {
+        if (branch == _state.value.defaultBranch) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(settingDefault = branch, error = null)
+            runCatching { repo.setDefaultBranch(owner, name, branch) }
+                .onSuccess { r ->
+                    _state.value = _state.value.copy(
+                        settingDefault = null,
+                        defaultBranch = r.defaultBranch,
+                        message = "Default branch set to '${r.defaultBranch}'",
+                    )
+                }
+                .onFailure {
+                    _state.value = _state.value.copy(
+                        settingDefault = null,
+                        error = friendly(it, "set '$branch' as default"),
+                    )
+                }
         }
     }
 

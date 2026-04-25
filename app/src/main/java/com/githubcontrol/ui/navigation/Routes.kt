@@ -45,6 +45,7 @@ object Routes {
     const val ABOUT = "about"
     const val HEALTH = "health"
     const val ONBOARDING = "onboarding"
+    const val USER_PROFILE = "user_profile/{login}"
 
     fun repoDetail(owner: String, name: String) = "repo/$owner/$name"
     fun files(owner: String, name: String, path: String = "", ref: String = "") =
@@ -75,4 +76,5 @@ object Routes {
     fun compare(owner: String, name: String, base: String = "", head: String = "") =
         "compare/$owner/$name?base=${java.net.URLEncoder.encode(base, "UTF-8")}&head=${java.net.URLEncoder.encode(head, "UTF-8")}"
     fun collaborators(owner: String, name: String) = "collaborators/$owner/$name"
+    fun userProfile(login: String) = "user_profile/$login"
 }

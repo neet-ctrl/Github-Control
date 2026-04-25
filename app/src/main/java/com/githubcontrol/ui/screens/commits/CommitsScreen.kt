@@ -6,6 +6,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountTree
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -18,17 +20,59 @@ import com.githubcontrol.viewmodel.CommitsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CommitsScreen(owner: String, name: String, branch: String, onBack: () -> Unit, onOpenCommit: (String) -> Unit, vm: CommitsViewModel = hiltViewModel()) {
+fun CommitsScreen(
+    owner: String,
+    name: String,
+    branch: String,
+    onBack: () -> Unit,
+    onOpenCommit: (String) -> Unit,
+    vm: CommitsViewModel = hiltViewModel()
+) {
     LaunchedEffect(owner, name, branch) { vm.load(owner, name, branch) }
     val s by vm.state.collectAsState()
     val listState = rememberLazyListState()
-    LaunchedEffect(listState) {
+    var pickerOpen by remember { mutableStateOf(false) }
+
+    LaunchedEffect(listState, s.commits.size) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
-            .collect { last -> if (last >= s.commits.size - 3) vm.loadMore(owner, name) }
+            .collect { last -> if (s.commits.isNotEmpty() && last >= s.commits.size - 3) vm.loadMore(owner, name) }
     }
     Scaffold(topBar = {
-        TopAppBar(title = { Text("Commits • ${branch.ifBlank { "default" }}") },
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } })
+        val current = s.branch.ifBlank { s.defaultBranch.ifBlank { "default" } }
+        TopAppBar(
+            title = { Text("Commits • $current", maxLines = 1) },
+            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
+            actions = {
+                Box {
+                    TextButton(onClick = { pickerOpen = true }, enabled = s.branches.isNotEmpty()) {
+                        Icon(Icons.Filled.AccountTree, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(current, maxLines = 1)
+                    }
+                    DropdownMenu(expanded = pickerOpen, onDismissRequest = { pickerOpen = false }) {
+                        s.branches.forEach { br ->
+                            val selected = br.name == current
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                        Text(br.name, modifier = Modifier.weight(1f))
+                                        if (br.name == s.defaultBranch) {
+                                            Spacer(Modifier.width(6.dp))
+                                            AssistChip(onClick = {}, label = { Text("default") })
+                                        }
+                                    }
+                                },
+                                leadingIcon = { if (selected) Icon(Icons.Filled.Check, null) },
+                                onClick = {
+                                    pickerOpen = false
+                                    vm.selectBranch(owner, name, br.name)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        )
     }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (s.loading && s.commits.isEmpty()) {

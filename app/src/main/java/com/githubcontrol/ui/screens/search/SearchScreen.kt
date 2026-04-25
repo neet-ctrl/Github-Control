@@ -65,7 +65,7 @@ fun SearchScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: SearchVie
                         }
                     }
                     SearchKind.USERS -> items(s.users) { u ->
-                        GhCard {
+                        GhCard(onClick = { onNavigate(Routes.userProfile(u.login)) }) {
                             Text(u.login, style = MaterialTheme.typography.titleMedium)
                             Text(u.name ?: "", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

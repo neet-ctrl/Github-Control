@@ -66,7 +66,6 @@ fun AppRoot() {
     val corner by am.cornerRadiusFlow.collectAsState(initial = 14)
     val terminal by am.terminalThemeFlow.collectAsState(initial = "github-dark")
     val onboardingDone by am.onboardingCompletedFlow.collectAsState(initial = true)
-    val addingAccount by main.addingAccount.collectAsState()
     val lastRoute by am.lastRouteFlow.collectAsState(initial = null)
 
     val settings = ThemeSettings(
@@ -78,10 +77,12 @@ fun AppRoot() {
     GitHubControlTheme(settings = settings) {
         val nav = rememberNavController()
 
-        LaunchedEffect(state.loggedIn, state.locked, onboardingDone, addingAccount) {
+        LaunchedEffect(state.loggedIn, state.locked, onboardingDone) {
+            // The "add another account" flow intentionally skips this auto-routing —
+            // it lives entirely in the existing back stack so that the back button
+            // returns the user to AccountsScreen / Dashboard after sign-in completes.
             val target = when {
                 !onboardingDone -> Routes.ONBOARDING
-                addingAccount -> Routes.LOGIN
                 !state.loggedIn -> Routes.LOGIN
                 state.locked -> Routes.BIOMETRIC
                 else -> lastRoute ?: Routes.DASHBOARD
@@ -110,8 +111,16 @@ fun AppRoot() {
             }
             composable(Routes.LOGIN) {
                 LoginScreen(main) {
+                    val wasAdding = main.addingAccount.value
                     main.endAddAccount()
-                    nav.navigate(Routes.DASHBOARD) { popUpTo(0) { inclusive = true } }
+                    if (wasAdding && nav.previousBackStackEntry != null) {
+                        // Came from AccountsScreen / Dashboard — pop back to it
+                        // so the user lands on the screen they invoked Add from
+                        // and the back button continues to work normally.
+                        nav.popBackStack()
+                    } else {
+                        nav.navigate(Routes.DASHBOARD) { popUpTo(0) { inclusive = true } }
+                    }
                 }
             }
             composable(Routes.BIOMETRIC) {
@@ -295,8 +304,10 @@ fun AppRoot() {
             }
             composable(Routes.ACCOUNTS) {
                 AccountsScreen(main, onBack = { nav.popBackStack() }, onAdd = {
+                    // Keep AccountsScreen on the back stack so the back button on the
+                    // login screen / after sign-in returns the user where they were.
                     main.beginAddAccount()
-                    nav.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } }
+                    nav.navigate(Routes.LOGIN)
                 })
             }
             composable(Routes.COMMAND) { CommandScreen(onBack = { nav.popBackStack() }) }
@@ -386,6 +397,16 @@ fun AppRoot() {
                     onBack = { nav.popBackStack() },
                     onCheckUpdates = { /* AboutScreen handles its own check */ },
                     onClearCache = { com.githubcontrol.utils.Logger.clear() }
+                )
+            }
+            composable(
+                Routes.USER_PROFILE,
+                arguments = listOf(navArgument("login") { type = NavType.StringType })
+            ) { back ->
+                com.githubcontrol.ui.screens.profile.UserProfileScreen(
+                    login = back.arguments?.getString("login") ?: "",
+                    onBack = { nav.popBackStack() },
+                    onOpenRepo = { o, n -> nav.navigate(Routes.repoDetail(o, n)) }
                 )
             }
             composable(Routes.HEALTH) {

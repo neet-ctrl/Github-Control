@@ -30,6 +30,11 @@ class GitHubRepository @Inject constructor(
         api.myStarred(me.login, perPage, page)
     }
 
+    suspend fun user(login: String): GhUser = withContext(Dispatchers.IO) { api.user(login) }
+
+    suspend fun userRepos(login: String, page: Int = 1, perPage: Int = 30): List<GhRepo> =
+        withContext(Dispatchers.IO) { api.userRepos(login, perPage = perPage, page = page) }
+
     suspend fun repo(owner: String, name: String) = withContext(Dispatchers.IO) { api.repo(owner, name) }
 
     suspend fun createRepo(req: CreateRepoRequest) = withContext(Dispatchers.IO) { api.createRepo(req) }
@@ -115,6 +120,24 @@ class GitHubRepository @Inject constructor(
     suspend fun deleteBranch(owner: String, name: String, branch: String) {
         api.deleteRef(owner, name, "heads/$branch")
     }
+
+    /** Force-update a branch ref to point at [sha] — equivalent to a hard reset. */
+    suspend fun hardResetBranch(owner: String, name: String, branch: String, sha: String): GhRef =
+        withContext(Dispatchers.IO) {
+            api.updateRef(owner, name, "heads/$branch", UpdateRefRequest(sha = sha, force = true))
+        }
+
+    /** Create a new branch [newBranch] pointing at the existing [sha]. */
+    suspend fun createBranchAtSha(owner: String, name: String, newBranch: String, sha: String): GhRef =
+        withContext(Dispatchers.IO) {
+            api.createRef(owner, name, CreateRefRequest("refs/heads/$newBranch", sha))
+        }
+
+    /** Update the repository's default branch via the repo PATCH endpoint. */
+    suspend fun setDefaultBranch(owner: String, name: String, branch: String): GhRepo =
+        withContext(Dispatchers.IO) {
+            api.updateRepo(owner, name, UpdateRepoRequest(defaultBranch = branch))
+        }
 
     /**
      * Use GitHub's dedicated branch-rename endpoint when possible (single, atomic call,

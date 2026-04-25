@@ -8,6 +8,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -26,6 +28,7 @@ fun BranchesScreen(owner: String, name: String, onBack: () -> Unit, vm: Branches
     var createDialog by remember { mutableStateOf(false) }
     var renameDialog by remember { mutableStateOf<String?>(null) }
     var deleteDialog by remember { mutableStateOf<String?>(null) }
+    var setDefaultDialog by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = {
@@ -41,15 +44,36 @@ fun BranchesScreen(owner: String, name: String, onBack: () -> Unit, vm: Branches
                 s.message?.let { Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(8.dp)) }
                 LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(s.items, key = { it.name }) { b ->
+                        val isDefault = b.name == s.defaultBranch
+                        val busy = s.settingDefault == b.name
                         GhCard {
-                            Row {
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(b.name, style = MaterialTheme.typography.titleSmall)
+                                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                        Text(b.name, style = MaterialTheme.typography.titleSmall)
+                                        if (isDefault) {
+                                            Spacer(Modifier.width(6.dp))
+                                            GhBadge("default", MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
                                     Text(b.commit.sha.take(7), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 if (b.protected) GhBadge("protected", MaterialTheme.colorScheme.tertiary)
+                                IconButton(
+                                    onClick = { if (!isDefault) setDefaultDialog = b.name },
+                                    enabled = !isDefault && !busy
+                                ) {
+                                    Icon(
+                                        if (isDefault) Icons.Filled.Star else Icons.Filled.StarBorder,
+                                        contentDescription = if (isDefault) "Default branch" else "Set as default",
+                                        tint = if (isDefault) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                                    )
+                                }
                                 IconButton(onClick = { renameDialog = b.name }) { Icon(Icons.Filled.Edit, null) }
-                                IconButton(onClick = { deleteDialog = b.name }) { Icon(Icons.Filled.Delete, null) }
+                                IconButton(
+                                    onClick = { deleteDialog = b.name },
+                                    enabled = !isDefault
+                                ) { Icon(Icons.Filled.Delete, null) }
                             }
                         }
                     }
@@ -87,6 +111,26 @@ fun BranchesScreen(owner: String, name: String, onBack: () -> Unit, vm: Branches
             title = { Text("Delete '$br'?") },
             confirmButton = { TextButton(onClick = { vm.delete(owner, name, br); deleteDialog = null }) { Text("Delete", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton(onClick = { deleteDialog = null }) { Text("Cancel") } }
+        )
+    }
+    setDefaultDialog?.let { br ->
+        AlertDialog(
+            onDismissRequest = { setDefaultDialog = null },
+            icon = { Icon(Icons.Filled.Star, null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Set '$br' as default?") },
+            text = {
+                Text(
+                    "This makes '$br' the default branch for the repository. " +
+                    "New clones, pull requests and the GitHub UI will use it as the base branch."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.setDefault(owner, name, br)
+                    setDefaultDialog = null
+                }) { Text("Set as default") }
+            },
+            dismissButton = { TextButton(onClick = { setDefaultDialog = null }) { Text("Cancel") } }
         )
     }
 }

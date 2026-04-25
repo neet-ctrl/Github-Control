@@ -103,6 +103,29 @@ and ZIP-folder download via the Storage Access Framework.
 - **Sync screen** — full setup flow: Info card explainer, "Add sync job" FAB
   launches `OpenDocumentTree` + persists URI permission, dialog captures
   owner/repo/branch/remotePath/interval, toggle + delete wired to the DAO.
+- **Add-account back-stack fix** — `AppRoot` no longer treats `addingAccount`
+  as a routing trigger (it was tearing down the back stack). `AccountsScreen`
+  now navigates to LOGIN with no `popUpTo`, and `LoginScreen.onDone` simply
+  pops back when finishing an add-account flow, returning the user to the
+  Accounts/Dashboard screen with a working back button.
+- **User profile screen** — new `UserProfileScreen` + `UserProfileViewModel`
+  reachable from search results: tapping a user surfaces their profile card
+  (avatar, bio, follower counts) plus a paginated list of public repos using
+  the new `users/{user}/repos` endpoint and `Routes.userProfile(login)`.
+- **Branch picker on commits** — `CommitsScreen` exposes a top-bar branch
+  dropdown sourced from `repo.branches()`, with the repo's default branch
+  flagged. `CommitsViewModel.selectBranch` re-loads the commit list when the
+  user picks a different branch.
+- **Commit-detail actions** — `CommitDetailScreen` now offers two top
+  actions: "Reset <default> to this commit" (force-updates `heads/<default>`
+  via `repo.hardResetBranch`) and "New branch" (opens a name dialog, calls
+  `repo.createBranchAtSha`). Both surface results through a snackbar and
+  guard against repeated taps with `actionInFlight`.
+- **Set default branch** — `BranchesScreen` shows a star toggle per row;
+  tapping a non-default branch opens a confirmation dialog and calls
+  `BranchesViewModel.setDefault`, which patches the repo through
+  `UpdateRepoRequest.defaultBranch`. The default branch is also protected
+  from accidental deletion.
 
 ## Building the APK
 The Replit container can NOT compile Android. Use the GitHub Actions workflow

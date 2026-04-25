@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AddCircleOutline
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -28,16 +30,30 @@ import com.githubcontrol.viewmodel.CommitsViewModel
 fun CommitDetailScreen(owner: String, name: String, sha: String, onBack: () -> Unit, vm: CommitsViewModel = hiltViewModel()) {
     LaunchedEffect(owner, name, sha) { vm.loadDetail(owner, name, sha) }
     val s by vm.detail.collectAsState()
+    val snackbarHost = remember { SnackbarHostState() }
+    var showResetConfirm by remember { mutableStateOf(false) }
+    var showCreateBranch by remember { mutableStateOf(false) }
+    var newBranchName by remember { mutableStateOf("") }
 
-    Scaffold(topBar = {
-        TopAppBar(title = { Text(sha.take(7)) },
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
-            actions = {
-                FilterChip(selected = s.ignoreWhitespace, onClick = { vm.toggleIgnoreWs() }, label = { Text("ws") })
-                Spacer(Modifier.width(4.dp))
-                FilterChip(selected = s.sideBySide, onClick = { vm.toggleSideBySide() }, label = { Text("split") })
-            })
-    }) { pad ->
+    LaunchedEffect(s.actionMessage) {
+        s.actionMessage?.let {
+            snackbarHost.showSnackbar(it)
+            vm.clearDetailMessage()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(title = { Text(sha.take(7)) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
+                actions = {
+                    FilterChip(selected = s.ignoreWhitespace, onClick = { vm.toggleIgnoreWs() }, label = { Text("ws") })
+                    Spacer(Modifier.width(4.dp))
+                    FilterChip(selected = s.sideBySide, onClick = { vm.toggleSideBySide() }, label = { Text("split") })
+                })
+        },
+        snackbarHost = { SnackbarHost(snackbarHost) }
+    ) { pad ->
         val c = s.commit
         when {
             s.loading -> Box(Modifier.padding(pad).fillMaxSize()) { LoadingIndicator() }
@@ -49,6 +65,36 @@ fun CommitDetailScreen(owner: String, name: String, sha: String, onBack: () -> U
                     Text("${c.commit.author.name} <${c.commit.author.email}>", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(2.dp))
                     Text("+${c.stats?.additions ?: 0} −${c.stats?.deletions ?: 0} (${c.files?.size ?: 0} files)", style = MaterialTheme.typography.labelMedium)
+                }
+                // Top-level actions for this commit: reset default branch here, or branch off of it.
+                GhCard {
+                    Text("Actions", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { showResetConfirm = true },
+                            enabled = !s.actionInFlight && s.defaultBranch.isNotBlank(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.RestartAlt, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Reset ${s.defaultBranch.ifBlank { "default" }}", maxLines = 1)
+                        }
+                        OutlinedButton(
+                            onClick = { newBranchName = ""; showCreateBranch = true },
+                            enabled = !s.actionInFlight,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.AddCircleOutline, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("New branch", maxLines = 1)
+                        }
+                    }
+                    if (s.actionInFlight) {
+                        Spacer(Modifier.height(8.dp))
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
                 }
                 (c.files ?: emptyList()).forEach { f ->
                     GhCard {
@@ -65,6 +111,61 @@ fun CommitDetailScreen(owner: String, name: String, sha: String, onBack: () -> U
                 }
             }
         }
+    }
+
+    if (showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            icon = { Icon(Icons.Filled.RestartAlt, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Hard reset ${s.defaultBranch}?") },
+            text = {
+                Text(
+                    "This will force-update '${s.defaultBranch}' to point at ${sha.take(7)}. " +
+                    "Commits after this one on '${s.defaultBranch}' will no longer be reachable from the branch tip. " +
+                    "This cannot be undone from the app."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showResetConfirm = false
+                    vm.hardResetDefaultBranch(owner, name, sha)
+                }) { Text("Hard reset", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { showResetConfirm = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (showCreateBranch) {
+        AlertDialog(
+            onDismissRequest = { showCreateBranch = false },
+            icon = { Icon(Icons.Filled.AddCircleOutline, null) },
+            title = { Text("Create branch from ${sha.take(7)}") },
+            text = {
+                Column {
+                    Text("New branch will point at this commit.")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = newBranchName,
+                        onValueChange = { newBranchName = it.trim() },
+                        singleLine = true,
+                        label = { Text("Branch name") },
+                        placeholder = { Text("feature/my-change") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = newBranchName.isNotBlank(),
+                    onClick = {
+                        val n = newBranchName
+                        showCreateBranch = false
+                        vm.createBranchAtSha(owner, name, sha, n)
+                    }
+                ) { Text("Create") }
+            },
+            dismissButton = { TextButton(onClick = { showCreateBranch = false }) { Text("Cancel") } }
+        )
     }
 }
 

@@ -29,6 +29,16 @@ interface GitHubApi {
         @Query("page") page: Int = 1
     ): List<GhRepo>
 
+    @GET("users/{user}/repos")
+    suspend fun userRepos(
+        @Path("user") user: String,
+        @Query("type") type: String = "owner",
+        @Query("sort") sort: String = "updated",
+        @Query("direction") direction: String = "desc",
+        @Query("per_page") perPage: Int = 30,
+        @Query("page") page: Int = 1
+    ): List<GhRepo>
+
     @GET("repos/{owner}/{repo}")
     suspend fun repo(@Path("owner") owner: String, @Path("repo") repo: String): GhRepo
 
