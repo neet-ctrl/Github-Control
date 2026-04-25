@@ -79,8 +79,14 @@ fun TreeScreen(owner: String, name: String, ref: String, onBack: () -> Unit, onP
             }
         )
     }) { pad ->
-        Column(Modifier.padding(pad).fillMaxSize()) {
-            if (s.loading) { LoadingIndicator(); return@Scaffold }
+        // Render loading and ready states as siblings (if/else) instead of an
+        // early `return@Scaffold` after emitting the spinner — the early-return
+        // pattern reliably crashes Compose with a "Start/end imbalance" runtime
+        // error on Android 15 once the loading flag flips. This was the cause
+        // of the Tree-screen crash report.
+        if (s.loading) {
+            Column(Modifier.padding(pad).fillMaxSize()) { LoadingIndicator() }
+        } else Column(Modifier.padding(pad).fillMaxSize()) {
             s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
             if (s.truncated) Text("Tree truncated by GitHub (very large repo)", color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(8.dp))
             if (downloading) LinearProgressIndicator(Modifier.fillMaxWidth())

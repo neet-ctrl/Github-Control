@@ -33,11 +33,15 @@ fun BranchesScreen(owner: String, name: String, onBack: () -> Unit, vm: Branches
         },
         floatingActionButton = { FloatingActionButton(onClick = { createDialog = true }) { Icon(Icons.Filled.Add, null) } }
     ) { pad ->
-        if (s.loading) { LoadingIndicator(); return@Scaffold }
-        s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(8.dp)) }
-        s.message?.let { Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(8.dp)) }
-        LazyColumn(Modifier.padding(pad), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(s.items, key = { it.name }) { b ->
+        // Sibling if/else avoids the Compose Start/end imbalance crash that the
+        // earlier `return@Scaffold` pattern triggered on Android 15.
+        if (s.loading) {
+            Column(Modifier.padding(pad).fillMaxSize()) { LoadingIndicator() }
+        } else Column(Modifier.padding(pad).fillMaxSize()) {
+            s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(8.dp)) }
+            s.message?.let { Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(8.dp)) }
+            LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(s.items, key = { it.name }) { b ->
                 GhCard {
                     Row {
                         Column(Modifier.weight(1f)) {

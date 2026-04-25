@@ -93,7 +93,13 @@ class GitHubRepository @Inject constructor(
     suspend fun workflows(owner: String, name: String) = withContext(Dispatchers.IO) { api.workflows(owner, name) }
     suspend fun workflowRuns(owner: String, name: String, page: Int = 1) = withContext(Dispatchers.IO) { api.workflowRuns(owner, name, page = page) }
     suspend fun dispatchWorkflow(owner: String, name: String, id: Long, ref: String, inputs: Map<String, String> = emptyMap()) = withContext(Dispatchers.IO) {
-        api.dispatchWorkflow(owner, name, id, mapOf("ref" to ref, "inputs" to inputs))
+        val body = kotlinx.serialization.json.buildJsonObject {
+            put("ref", kotlinx.serialization.json.JsonPrimitive(ref))
+            put("inputs", kotlinx.serialization.json.buildJsonObject {
+                inputs.forEach { (k, v) -> put(k, kotlinx.serialization.json.JsonPrimitive(v)) }
+            })
+        }
+        api.dispatchWorkflow(owner, name, id, body)
     }
 
     suspend fun searchRepos(q: String, page: Int = 1) = withContext(Dispatchers.IO) { api.searchRepos(q, page = page) }
@@ -117,19 +123,41 @@ class GitHubRepository @Inject constructor(
     }
 
     /**
-     * Use GitHub's dedicated branch-rename endpoint when possible (single, atomic call,
-     * also moves protections, PR head refs, etc.). Falls back to the legacy create+delete
-     * dance only if the dedicated endpoint refuses (e.g. older GHES instance).
+     * Renames a branch. Tries GitHub's dedicated rename endpoint first (atomic,
+     * moves protections + PR head refs); falls back to legacy create-then-delete
+     * when the dedicated endpoint refuses.
+     *
+     * After either path succeeds, we re-list the repo branches and, if the old
+     * name is still present (the dedicated endpoint should remove it but we've
+     * seen leftover refs in the wild), explicitly delete it. The old branch
+     * sticking around was the bug behind "renaming creates a new branch but
+     * doesn't delete the old one".
      */
     suspend fun renameBranch(owner: String, name: String, oldName: String, newName: String) =
         withContext(Dispatchers.IO) {
-            runCatching { api.renameBranch(owner, name, oldName, RenameBranchRequest(newName)) }
-                .getOrElse {
-                    val src = api.branch(owner, name, oldName)
+            try {
+                api.renameBranch(owner, name, oldName, RenameBranchRequest(newName))
+            } catch (_: Throwable) {
+                val src = api.branch(owner, name, oldName)
+                runCatching {
                     api.createRef(owner, name, CreateRefRequest("refs/heads/$newName", src.commit.sha))
-                    api.deleteRef(owner, name, "heads/$oldName")
-                    api.branch(owner, name, newName)
                 }
+                runCatching { api.deleteRef(owner, name, "heads/$oldName") }
+                api.branch(owner, name, newName)
+            }
+
+            // Defensive cleanup — the dedicated endpoint normally removes the
+            // source ref, but if it's somehow still listed we delete it now.
+            // 404 / 422 from this delete just means it's already gone, which
+            // is the desired state, so we swallow them.
+            runCatching {
+                val all = api.branches(owner, name).map { it.name }
+                if (oldName in all && newName in all) {
+                    runCatching { api.deleteRef(owner, name, "heads/$oldName") }
+                }
+            }
+
+            api.branch(owner, name, newName)
         }
 
     // ---------- Branch protection ----------
@@ -152,7 +180,8 @@ class GitHubRepository @Inject constructor(
     suspend fun deleteGpgKey(id: Long) = withContext(Dispatchers.IO) { api.deleteGpgKey(id) }
 
     // ---------- Profile ----------
-    suspend fun updateMe(body: UpdateUserRequest) = withContext(Dispatchers.IO) { api.updateMe(body) }
+    suspend fun updateMe(body: kotlinx.serialization.json.JsonObject) =
+        withContext(Dispatchers.IO) { api.updateMe(body) }
 
     // ---------- Collaborators ----------
     suspend fun collaborators(owner: String, name: String) = withContext(Dispatchers.IO) { api.collaborators(owner, name) }

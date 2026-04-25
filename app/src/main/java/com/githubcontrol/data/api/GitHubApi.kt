@@ -232,10 +232,18 @@ interface GitHubApi {
         @Query("page") page: Int = 1
     ): GhWorkflowRunsResponse
 
+    /**
+     * Dispatches a workflow run. Body must be a JSON object like
+     * `{"ref": "main", "inputs": {...}}`. We send a [JsonObject] hand-built by
+     * the caller because kotlinx.serialization can't encode `Map<String, Any>`
+     * (no built-in serializer for `Any`) — passing a heterogeneous Map would
+     * silently throw before the network request ever fires, which is why the
+     * Run Workflow button looked dead in the app.
+     */
     @POST("repos/{owner}/{repo}/actions/workflows/{id}/dispatches")
     suspend fun dispatchWorkflow(
         @Path("owner") owner: String, @Path("repo") repo: String, @Path("id") id: Long,
-        @Body body: Map<String, @JvmSuppressWildcards Any>
+        @Body body: kotlinx.serialization.json.JsonObject
     ): Response<Unit>
 
     @GET("repos/{owner}/{repo}/actions/runs/{run_id}/logs")
@@ -314,8 +322,16 @@ interface GitHubApi {
 
     // ---------- Profile editor ----------
 
+    /**
+     * GitHub's PATCH /user accepts only the keys you send. Our shared Json
+     * instance has `explicitNulls = false`, so a typed request data class with
+     * nullable fields would lose every "cleared" field (the user can't blank
+     * out their bio, for example). We therefore take a [JsonObject] the caller
+     * assembles with [kotlinx.serialization.json.buildJsonObject] using
+     * empty strings for cleared text fields.
+     */
     @PATCH("user")
-    suspend fun updateMe(@Body body: UpdateUserRequest): GhUser
+    suspend fun updateMe(@Body body: kotlinx.serialization.json.JsonObject): GhUser
 
     // ---------- Collaborators ----------
 
