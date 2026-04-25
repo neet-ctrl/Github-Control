@@ -39,6 +39,8 @@ object Routes {
     const val BRANCH_PROTECTION = "branch_protection/{owner}/{name}/{branch}"
     const val COMPARE = "compare/{owner}/{name}?base={base}&head={head}"
     const val COLLABORATORS = "collaborators/{owner}/{name}"
+    const val PERMISSIONS = "permissions"
+    const val CRASHES = "crashes"
 
     fun repoDetail(owner: String, name: String) = "repo/$owner/$name"
     fun files(owner: String, name: String, path: String = "", ref: String = "") =

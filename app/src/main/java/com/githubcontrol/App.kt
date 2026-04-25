@@ -22,6 +22,7 @@ class App : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        com.githubcontrol.utils.CrashHandler.install(this)
         createNotificationChannels()
         com.githubcontrol.utils.Logger.i("App", "GitHub Control starting v${runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "?"}")
     }

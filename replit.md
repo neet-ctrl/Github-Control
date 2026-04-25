@@ -40,6 +40,16 @@ com.githubcontrol
 - **Logger ring buffer** (`utils/Logger.kt`) feeds every `EmbeddedTerminal` and the
   full `LogScreen`. Sensitive values (`token=`, `Authorization`, `Bearer`) are
   redacted before storage. Capacity is 1500 entries.
+- **CrashHandler** (`utils/CrashHandler.kt`) is installed in `App.onCreate` and
+  catches every uncaught exception (any thread). Reports include device info,
+  full cause chain, and the last 200 log entries; they are written to
+  `filesDir/crashes/*.txt` and kept permanently until the user deletes them from
+  the **Crash reports** screen (which has copy / share / delete-all actions).
+- **Permissions hub** (`ui/screens/settings/PermissionsScreen.kt`, backed by
+  `utils/PermissionsCatalog.kt`) lists every permission the app can use, shows
+  current status, and lets the user grant any single permission with one tap or
+  ask for all of them at once. Special permissions (battery optimisation, "all
+  files access") deep-link to the right system settings page.
 - **Token validation** (`data/auth/TokenValidator.kt`) records HTTP code, scopes,
   rate-limit, token type/expiry into `TokenValidation` snapshots that are stored on
   the `Account` (last 20 retained) and rendered in `AccountsScreen` + `LoginScreen`.
@@ -47,8 +57,14 @@ com.githubcontrol
   rendering and recommends a default set (`repo`, `read:user`, `read:org`,
   `notifications`, `workflow`).
 - **EmbeddedTerminal** is mounted on Login, Tree, Upload, Sync, Command, Profile,
-  SshKeys, BranchProtection, Compare, Collaborators, and is reachable globally via
-  Settings → Tools → Terminal log.
+  SshKeys, BranchProtection, Compare, Collaborators, Permissions, and is reachable
+  globally via Settings → Tools → Terminal log.
+- **Universal file viewer** (`FilePreviewScreen` + `PreviewViewModel`) recognises
+  text, source code, Markdown, images, SVG, HTML (WebView), PDF (native
+  PdfRenderer, multi-page), audio & video (MediaPlayer/VideoView), zip archives
+  (entry list), and unknown binaries (hex dump). Every preview has copy /
+  download-to-device (SAF) / open-with-system-app actions, and large blobs fall
+  through to the GitHub raw URL via `rawDownload`.
 
 ## Notable screens added in this iteration
 | Route                         | Screen                       |

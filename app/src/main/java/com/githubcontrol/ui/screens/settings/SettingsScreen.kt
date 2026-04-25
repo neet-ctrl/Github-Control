@@ -61,6 +61,20 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
                 TextButton(onClick = { onNavigate(Routes.DOWNLOADS) }, modifier = Modifier.fillMaxWidth()) { Text("Downloads") }
                 TextButton(onClick = { onNavigate(Routes.COMMAND) }, modifier = Modifier.fillMaxWidth()) { Text("Command Mode") }
                 TextButton(onClick = { onNavigate(Routes.LOGS) }, modifier = Modifier.fillMaxWidth()) { Text("Terminal log") }
+                TextButton(onClick = { onNavigate(Routes.CRASHES) }, modifier = Modifier.fillMaxWidth()) { Text("Crash reports") }
+            }
+            GhCard {
+                Text("Permissions", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Review every permission the app uses and grant the ones that are missing — one tap per permission.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { onNavigate(Routes.PERMISSIONS) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Open permissions hub")
+                }
             }
             GhCard {
                 Text("Danger zone", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)

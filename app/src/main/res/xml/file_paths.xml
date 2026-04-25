@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <files-path name="downloads" path="downloads/" />
+    <files-path name="crashes" path="crashes/" />
     <cache-path name="cache" path="." />
+    <cache-path name="preview" path="preview/" />
     <external-files-path name="external" path="." />
+    <external-cache-path name="ext_cache" path="." />
 </paths>

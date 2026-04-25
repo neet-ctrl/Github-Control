@@ -330,6 +330,12 @@ fun AppRoot() {
                     onBack = { nav.popBackStack() }
                 )
             }
+            composable(Routes.PERMISSIONS) {
+                com.githubcontrol.ui.screens.settings.PermissionsScreen(onBack = { nav.popBackStack() })
+            }
+            composable(Routes.CRASHES) {
+                com.githubcontrol.ui.screens.settings.CrashLogScreen(onBack = { nav.popBackStack() })
+            }
         }
     }
 }
