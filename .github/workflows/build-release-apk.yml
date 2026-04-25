@@ -49,6 +49,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build signed release APK
+        id: build
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Locate APK
@@ -60,6 +61,7 @@ jobs:
           echo "name=$(basename "$APK_PATH")" >> "$GITHUB_OUTPUT"
 
       - name: Upload release APK as workflow artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: github-control-release-apk
@@ -67,25 +69,72 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Create GitHub Release with signed APK
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Get APK info
+        id: apk-info
+        run: |
+          APK_PATH="${{ steps.apk.outputs.path }}"
+          APK_SIZE=$(stat -c%s "$APK_PATH")
+          APK_SIZE_MB=$(echo "scale=2; $APK_SIZE / 1048576" | bc)
+          echo "apk_size=$APK_SIZE_MB MB" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          DATE=$(date +'%B %d, %Y')
+          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+
+          RELEASE_BODY="## 🐙 GitHub Control v$VERSION
+
+          **Release Date:** $DATE
+
+          ### 📱 What's New
+          - Latest signed production build
+          - Includes all recent features, fixes and improvements
+          - Optimized and ready for everyday use
+
+          ### 📦 Package Details
+          - **Version:** $VERSION
+          - **Build Type:** Release (signed)
+          - **File Size:** ${{ steps.apk-info.outputs.apk_size }}
+          - **Platform:** Android 8.0+ (API 26+)
+          - **Commit:** \`${{ github.sha }}\`
+
+          ### 🚀 Features
+          - Browse, create, fork and manage repositories on multiple GitHub accounts
+          - Full Issues, Pull Requests, Releases, Actions and Notifications support
+          - Inline file editor with syntax highlighting and Markdown preview
+          - Branch management — create, rename, delete, set default, hard-reset
+          - Commit explorer with side-by-side diffs and per-commit actions
+          - User profile screen with public repo browsing
+          - Built-in JGit terminal mode and folder-sync to a chosen storage tree
+
+          ### ⚠️ Important Notes
+          - Signed release build — safe to install over previous releases
+          - Enable \"Install from Unknown Sources\" on your device
+          - Grant storage and notification permissions when prompted
+
+          ### 📥 Installation
+          1. Download the APK file below
+          2. Enable installation from unknown sources for your browser/file manager
+          3. Install and sign in with your GitHub Personal Access Token
+
+          ---
+          **Repository:** [GitHub](https://github.com/${{ github.repository }})"
+
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASE_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        if: success()
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
+          tag_name: v${{ github.run_number }}-release
+          name: GitHub Control Release Build ${{ github.run_number }}
+          body: ${{ steps.release-notes.outputs.body }}
+          files: |
+            ${{ steps.apk.outputs.path }}
           draft: false
           prerelease: false
-          generate_release_notes: true
-          body: |
-            ## GitHub Control — ${{ github.ref_name }}
-
-            Native Kotlin Android client for GitHub.
-
-            **Signed release APK.** Install on any Android 8.0+ (API 26+)
-            device with "Install unknown apps" enabled.
-
-            Built automatically by GitHub Actions from commit
-            `${{ github.sha }}`.
-          files: ${{ steps.apk.outputs.path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
