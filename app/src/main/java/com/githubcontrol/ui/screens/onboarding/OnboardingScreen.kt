@@ -17,7 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.GestureTwoTone
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
@@ -301,7 +301,7 @@ private fun onboardingPages(): List<OnboardingPageData> = listOf(
     OnboardingPageData(
         title = "A few power tips",
         subtitle = "Things that aren't obvious but make the app fly.",
-        icon = Icons.Filled.GestureTwoTone,
+        icon = Icons.Filled.TouchApp,
         color = Color(0xFF388BFD),
         bullets = listOf(
             Icons.Filled.CheckCircle to "Pull down on any list to refresh from GitHub",
