@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.githubcontrol.ui.components.AccountSwitcher
 import com.githubcontrol.ui.components.GhBadge
 import com.githubcontrol.ui.components.GhCard
 import com.githubcontrol.ui.components.LoadingIndicator
@@ -49,6 +50,16 @@ fun DashboardScreen(
             TopAppBar(
                 title = { Text("Dashboard") },
                 actions = {
+                    AccountSwitcher(
+                        accounts = authState.accounts,
+                        activeId = authState.accounts.firstOrNull { it.login == authState.activeLogin }?.id,
+                        onSwitch = { id -> main.switchAccount(id) },
+                        onManage = { onNavigate(Routes.ACCOUNTS) },
+                        onAdd = {
+                            main.beginAddAccount()
+                            onNavigate(Routes.LOGIN)
+                        }
+                    )
                     IconButton(onClick = { onNavigate(Routes.SEARCH) }) { Icon(Icons.Filled.Search, null) }
                     IconButton(onClick = { onNavigate(Routes.NOTIFICATIONS) }) {
                         BadgedBox(badge = { if (s.unreadNotifications > 0) Badge { Text(s.unreadNotifications.toString()) } }) {
