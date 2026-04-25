@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -67,25 +69,93 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Create GitHub Release with signed APK
+      - name: Generate version and release notes
+        id: release_info
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # Extract version from tag
+            VERSION="${{ github.ref_name }}"
+            IS_TAG="true"
+          else
+            # Generate version from branch and commit
+            BRANCH="${{ github.ref_name }}"
+            SHORT_SHA="${{ github.sha }}"
+            SHORT_SHA="${SHORT_SHA:0:7}"
+            VERSION="${BRANCH}-${SHORT_SHA}"
+            IS_TAG="false"
+          fi
+          
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "is_tag=$IS_TAG" >> "$GITHUB_OUTPUT"
+          
+          # Get commit count for build number
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          echo "build_number=$COMMIT_COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release from Tag
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ github.ref_name }}
+          name: ${{ steps.release_info.outputs.version }}
           tag_name: ${{ github.ref_name }}
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           generate_release_notes: true
           body: |
-            ## GitHub Control — ${{ github.ref_name }}
+            ## GitHub Control — ${{ steps.release_info.outputs.version }}
 
             Native Kotlin Android client for GitHub.
 
-            **Signed release APK.** Install on any Android 8.0+ (API 26+)
-            device with "Install unknown apps" enabled.
+            ### Release Details
+            - **Build Number:** ${{ steps.release_info.outputs.build_number }}
+            - **Commit SHA:** `${{ github.sha }}`
+            - **Ref:** ${{ github.ref_name }}
 
-            Built automatically by GitHub Actions from commit
-            `${{ github.sha }}`.
+            ### Installation
+            **Signed release APK** — Install on any Android 8.0+ (API 26+) device with "Install unknown apps" enabled.
+
+            ### What's Changed
+            Built automatically by GitHub Actions.
           files: ${{ steps.apk.outputs.path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release from Branch Push
+        if: |
+          !startsWith(github.ref, 'refs/tags/') && 
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.release_info.outputs.version }}
+          tag_name: ${{ steps.release_info.outputs.version }}
+          draft: false
+          prerelease: true
+          generate_release_notes: true
+          body: |
+            ## GitHub Control — ${{ steps.release_info.outputs.version }}
+
+            Native Kotlin Android client for GitHub.
+
+            ### Release Details
+            - **Build Number:** ${{ steps.release_info.outputs.build_number }}
+            - **Branch:** ${{ github.ref_name }}
+            - **Commit SHA:** `${{ github.sha }}`
+            - **Status:** Pre-release (automated build)
+
+            ### Installation
+            **Signed release APK** — Install on any Android 8.0+ (API 26+) device with "Install unknown apps" enabled.
+
+            ### About This Build
+            This is an automated pre-release build from the `${{ github.ref_name }}` branch.
+            Built automatically by GitHub Actions on `${{ github.event.head_commit.timestamp }}`.
+          files: ${{ steps.apk.outputs.path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload APK to Release (Fallback)
+        if: failure() && steps.apk.outputs.path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk-backup-${{ steps.release_info.outputs.version }}
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 90
