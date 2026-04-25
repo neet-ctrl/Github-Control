@@ -15,16 +15,20 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.githubcontrol.data.api.RequiredStatusChecks
-import com.githubcontrol.data.api.UpdateBranchProtectionRequest
-import com.githubcontrol.data.api.UpdateRequiredReviews
 import com.githubcontrol.data.repository.GitHubRepository
 import com.githubcontrol.ui.components.EmbeddedTerminal
 import com.githubcontrol.ui.components.GhCard
+import com.githubcontrol.ui.components.InfoIcon
 import com.githubcontrol.utils.Logger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import javax.inject.Inject
 
 data class BPState(
@@ -86,37 +90,78 @@ class BranchProtectionViewModel @Inject constructor(private val repo: GitHubRepo
         }
     }
     fun update(transform: (BPState) -> BPState) { state.value = transform(state.value) }
+
+    /**
+     * GitHub's PUT branch-protection endpoint requires `required_status_checks`,
+     * `enforce_admins`, `required_pull_request_reviews`, and `restrictions` to
+     * appear in the JSON body even when their value is null. We build the body
+     * by hand here so those keys are always present (the global Json instance
+     * uses explicitNulls=false and would otherwise drop them, causing HTTP 422).
+     */
+    private fun buildBody(s: BPState): JsonObject = buildJsonObject {
+        if (s.requireStatusChecks) {
+            put("required_status_checks", buildJsonObject {
+                put("strict", s.strictStatusChecks)
+                put("contexts", buildJsonArray {
+                    s.statusContexts.split(",")
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+                        .forEach { add(it) }
+                })
+            })
+        } else {
+            put("required_status_checks", JsonNull)
+        }
+
+        put("enforce_admins", s.enforceAdmins)
+
+        if (s.requireReviews) {
+            put("required_pull_request_reviews", buildJsonObject {
+                put("required_approving_review_count", s.reviewerCount.coerceIn(0, 6))
+                put("dismiss_stale_reviews", s.dismissStale)
+                put("require_code_owner_reviews", s.requireCodeOwners)
+            })
+        } else {
+            put("required_pull_request_reviews", JsonNull)
+        }
+
+        // Restrictions are only valid for organisation-owned repos. Sending null
+        // disables them, which is the correct default for personal repos too.
+        put("restrictions", JsonNull)
+
+        put("required_linear_history", s.linearHistory)
+        put("allow_force_pushes", s.allowForcePushes)
+        put("allow_deletions", s.allowDeletions)
+        put("required_conversation_resolution", s.requireConvResolution)
+        put("lock_branch", s.lockBranch)
+        put("block_creations", false)
+    }
+
     fun save() {
         val s = state.value
         viewModelScope.launch {
             state.value = s.copy(saving = true, error = null, message = null)
             try {
-                val req = UpdateBranchProtectionRequest(
-                    requiredStatusChecks = if (s.requireStatusChecks) RequiredStatusChecks(
-                        strict = s.strictStatusChecks,
-                        contexts = s.statusContexts.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                    ) else null,
-                    requiredReviews = if (s.requireReviews) UpdateRequiredReviews(
-                        requiredApprovingCount = s.reviewerCount.coerceIn(0, 6),
-                        dismissStale = s.dismissStale,
-                        requireCodeOwners = s.requireCodeOwners
-                    ) else null,
-                    enforceAdmins = s.enforceAdmins,
-                    requiredLinearHistory = s.linearHistory,
-                    allowForcePushes = s.allowForcePushes,
-                    allowDeletions = s.allowDeletions,
-                    requiredConversationResolution = s.requireConvResolution,
-                    lockBranch = s.lockBranch
-                )
-                repo.setBranchProtection(owner, name, branch, req)
+                repo.setBranchProtection(owner, name, branch, buildBody(s))
                 Logger.i("BranchProtection", "saved $owner/$name@$branch")
                 state.value = s.copy(saving = false, protected = true, message = "Saved.")
             } catch (t: Throwable) {
                 Logger.e("BranchProtection", "save failed", t)
-                state.value = s.copy(saving = false, error = t.message)
+                state.value = s.copy(saving = false, error = friendlyError(t))
             }
         }
     }
+
+    private fun friendlyError(t: Throwable): String {
+        val raw = t.message.orEmpty()
+        return when {
+            raw.contains("422") -> "GitHub rejected the rules (HTTP 422). Some options aren't valid for this branch — for example, status-check contexts must already exist on the repo, and reviewer rules require the repo to support pull requests."
+            raw.contains("403") -> "Permission denied (HTTP 403). You need admin rights on this repository to change protection rules."
+            raw.contains("404") -> "Branch not found (HTTP 404)."
+            else -> raw.ifEmpty { "Unknown error while saving protection." }
+        }
+    }
+
     fun remove() {
         viewModelScope.launch {
             try {
@@ -124,11 +169,15 @@ class BranchProtectionViewModel @Inject constructor(private val repo: GitHubRepo
                 Logger.w("BranchProtection", "removed $owner/$name@$branch")
                 state.value = BPState(loading = false, protected = false, message = "Protection removed.")
             } catch (t: Throwable) {
-                state.value = state.value.copy(error = t.message)
+                state.value = state.value.copy(error = friendlyError(t))
             }
         }
     }
 }
+
+/* ------------------------------------------------------------------------- */
+/*  UI                                                                       */
+/* ------------------------------------------------------------------------- */
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -145,67 +194,231 @@ fun BranchProtectionScreen(
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } }
         )
     }) { pad ->
-        Column(Modifier.padding(pad).padding(12.dp).fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (s.loading) { LinearProgressIndicator(Modifier.fillMaxWidth()); return@Column }
-            s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            s.message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+        // We deliberately render the loading and ready states as separate
+        // sibling branches of an if/else (rather than using `return@Column`
+        // after the spinner). Early-returning inside a Compose lambda after
+        // emitting a child has been observed to cause a "Start/end imbalance"
+        // crash in Compose 1.7 on Android 15 once `loading` flips back.
+        if (s.loading) {
+            Column(
+                Modifier.padding(pad).padding(12.dp).fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+        } else {
+            Column(
+                Modifier.padding(pad).padding(12.dp).fillMaxSize().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                s.message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
 
-            GhCard {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Lock, null, tint = if (s.protected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.width(8.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(if (s.protected) "Branch is protected" else "Branch is not protected", style = MaterialTheme.typography.titleMedium)
-                        Text("$owner/$name", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                GhCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.Lock,
+                            null,
+                            tint = if (s.protected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (s.protected) "Branch is protected" else "Branch is not protected",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                "$owner/$name",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        InfoIcon(
+                            "Branch protection",
+                            "Branch protection rules guard a branch (typically your default branch like main) " +
+                                    "against unsafe changes. Toggle the options below and tap Save protection. " +
+                                    "You need admin permission on the repository."
+                        )
                     }
                 }
-            }
 
-            GhCard {
-                Text("Pull request reviews", style = MaterialTheme.typography.titleMedium)
-                ListItem(headlineContent = { Text("Require approving reviews") }, trailingContent = { Switch(s.requireReviews, { v -> vm.update { it.copy(requireReviews = v) } }) })
-                if (s.requireReviews) {
-                    ListItem(headlineContent = { Text("Required reviewers") }, trailingContent = {
-                        OutlinedTextField(s.reviewerCount.toString(), { v -> v.toIntOrNull()?.let { vm.update { st -> st.copy(reviewerCount = it.coerceIn(0,6)) } } },
-                            singleLine = true, modifier = Modifier.width(80.dp))
-                    })
-                    ListItem(headlineContent = { Text("Dismiss stale reviews on new commits") }, trailingContent = { Switch(s.dismissStale, { v -> vm.update { it.copy(dismissStale = v) } }) })
-                    ListItem(headlineContent = { Text("Require code owner reviews") }, trailingContent = { Switch(s.requireCodeOwners, { v -> vm.update { it.copy(requireCodeOwners = v) } }) })
-                }
-            }
-
-            GhCard {
-                Text("Status checks", style = MaterialTheme.typography.titleMedium)
-                ListItem(headlineContent = { Text("Require status checks to pass") }, trailingContent = { Switch(s.requireStatusChecks, { v -> vm.update { it.copy(requireStatusChecks = v) } }) })
-                if (s.requireStatusChecks) {
-                    ListItem(headlineContent = { Text("Require branch up to date (strict)") }, trailingContent = { Switch(s.strictStatusChecks, { v -> vm.update { it.copy(strictStatusChecks = v) } }) })
-                    OutlinedTextField(s.statusContexts, { v -> vm.update { it.copy(statusContexts = v) } },
-                        label = { Text("Required check contexts (comma separated)") }, modifier = Modifier.fillMaxWidth())
-                }
-            }
-
-            GhCard {
-                Text("Other rules", style = MaterialTheme.typography.titleMedium)
-                ListItem(headlineContent = { Text("Include administrators") }, trailingContent = { Switch(s.enforceAdmins, { v -> vm.update { it.copy(enforceAdmins = v) } }) })
-                ListItem(headlineContent = { Text("Require linear history") }, trailingContent = { Switch(s.linearHistory, { v -> vm.update { it.copy(linearHistory = v) } }) })
-                ListItem(headlineContent = { Text("Require conversation resolution") }, trailingContent = { Switch(s.requireConvResolution, { v -> vm.update { it.copy(requireConvResolution = v) } }) })
-                ListItem(headlineContent = { Text("Lock branch (read-only)") }, trailingContent = { Switch(s.lockBranch, { v -> vm.update { it.copy(lockBranch = v) } }) })
-                ListItem(headlineContent = { Text("Allow force pushes") }, trailingContent = { Switch(s.allowForcePushes, { v -> vm.update { it.copy(allowForcePushes = v) } }) })
-                ListItem(headlineContent = { Text("Allow deletions") }, trailingContent = { Switch(s.allowDeletions, { v -> vm.update { it.copy(allowDeletions = v) } }) })
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { vm.save() }, enabled = !s.saving, modifier = Modifier.weight(1f)) {
-                    if (s.saving) CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-                    else { Icon(Icons.Filled.Save, null); Spacer(Modifier.width(6.dp)); Text("Save protection") }
-                }
-                if (s.protected) {
-                    OutlinedButton(onClick = { vm.remove() }, colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-                        Text("Remove")
+                GhCard {
+                    SectionHeader(
+                        "Pull request reviews",
+                        "Settings that control whether pull requests targeting this branch must be reviewed before they can be merged."
+                    )
+                    InfoSwitch(
+                        label = "Require approving reviews",
+                        info = "If enabled, every pull request needs at least the configured number of approving reviews before it can be merged into this branch.",
+                        checked = s.requireReviews,
+                        onChange = { v -> vm.update { it.copy(requireReviews = v) } }
+                    )
+                    if (s.requireReviews) {
+                        ListItem(
+                            headlineContent = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Required reviewers")
+                                    InfoIcon(
+                                        "Required reviewers",
+                                        "How many approving reviews each pull request must collect (1–6). Reviews from the PR author don't count."
+                                    )
+                                }
+                            },
+                            trailingContent = {
+                                OutlinedTextField(
+                                    value = s.reviewerCount.toString(),
+                                    onValueChange = { v ->
+                                        v.toIntOrNull()?.let { n ->
+                                            vm.update { st -> st.copy(reviewerCount = n.coerceIn(0, 6)) }
+                                        }
+                                    },
+                                    singleLine = true,
+                                    modifier = Modifier.width(80.dp)
+                                )
+                            }
+                        )
+                        InfoSwitch(
+                            label = "Dismiss stale reviews on new commits",
+                            info = "When new commits are pushed to a pull request, previously approving reviews are automatically dismissed and reviewers must re-approve.",
+                            checked = s.dismissStale,
+                            onChange = { v -> vm.update { it.copy(dismissStale = v) } }
+                        )
+                        InfoSwitch(
+                            label = "Require code owner reviews",
+                            info = "If a pull request changes files owned by someone listed in the repository's CODEOWNERS file, those owners must approve before merging.",
+                            checked = s.requireCodeOwners,
+                            onChange = { v -> vm.update { it.copy(requireCodeOwners = v) } }
+                        )
                     }
                 }
+
+                GhCard {
+                    SectionHeader(
+                        "Status checks",
+                        "Require automated checks (CI builds, tests, etc.) to pass before a pull request can be merged."
+                    )
+                    InfoSwitch(
+                        label = "Require status checks to pass",
+                        info = "Pull requests must wait for the configured status checks to report success before they can be merged.",
+                        checked = s.requireStatusChecks,
+                        onChange = { v -> vm.update { it.copy(requireStatusChecks = v) } }
+                    )
+                    if (s.requireStatusChecks) {
+                        InfoSwitch(
+                            label = "Require branch up to date (strict)",
+                            info = "Pull requests must be rebased or merged with the latest version of this branch before merging — guarantees the merged code was tested against the current head.",
+                            checked = s.strictStatusChecks,
+                            onChange = { v -> vm.update { it.copy(strictStatusChecks = v) } }
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Required check contexts", style = MaterialTheme.typography.bodyMedium)
+                            InfoIcon(
+                                "Required check contexts",
+                                "Comma-separated names of status checks that must pass. The names must match the contexts that your CI (GitHub Actions, etc.) reports — for example: build, test, lint."
+                            )
+                        }
+                        OutlinedTextField(
+                            value = s.statusContexts,
+                            onValueChange = { v -> vm.update { it.copy(statusContexts = v) } },
+                            label = { Text("e.g. build, test, lint") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                GhCard {
+                    SectionHeader(
+                        "Other rules",
+                        "Additional restrictions that apply to anyone pushing to or merging into this branch."
+                    )
+                    InfoSwitch(
+                        label = "Include administrators",
+                        info = "Apply these rules to repository administrators too. Without this, admins can bypass every protection rule.",
+                        checked = s.enforceAdmins,
+                        onChange = { v -> vm.update { it.copy(enforceAdmins = v) } }
+                    )
+                    InfoSwitch(
+                        label = "Require linear history",
+                        info = "Prevent merge commits. Pull requests must be merged using squash or rebase so the branch history stays linear.",
+                        checked = s.linearHistory,
+                        onChange = { v -> vm.update { it.copy(linearHistory = v) } }
+                    )
+                    InfoSwitch(
+                        label = "Require conversation resolution",
+                        info = "All review-comment threads must be resolved before a pull request can be merged.",
+                        checked = s.requireConvResolution,
+                        onChange = { v -> vm.update { it.copy(requireConvResolution = v) } }
+                    )
+                    InfoSwitch(
+                        label = "Lock branch (read-only)",
+                        info = "Make the branch read-only. No commits, merges, or pushes are allowed until it's unlocked.",
+                        checked = s.lockBranch,
+                        onChange = { v -> vm.update { it.copy(lockBranch = v) } }
+                    )
+                    InfoSwitch(
+                        label = "Allow force pushes",
+                        info = "Allow rewriting history on this branch with `git push --force`. Disabled by default because it can destroy other people's commits.",
+                        checked = s.allowForcePushes,
+                        onChange = { v -> vm.update { it.copy(allowForcePushes = v) } }
+                    )
+                    InfoSwitch(
+                        label = "Allow deletions",
+                        info = "Allow this branch to be deleted. Disabled by default to prevent accidental loss of important branches.",
+                        checked = s.allowDeletions,
+                        onChange = { v -> vm.update { it.copy(allowDeletions = v) } }
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { vm.save() },
+                        enabled = !s.saving,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (s.saving) {
+                            CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                        } else {
+                            Icon(Icons.Filled.Save, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Save protection")
+                        }
+                    }
+                    if (s.protected) {
+                        OutlinedButton(
+                            onClick = { vm.remove() },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) { Text("Remove") }
+                    }
+                }
+
+                EmbeddedTerminal(section = "BranchProtection")
             }
-            EmbeddedTerminal(section = "BranchProtection")
         }
     }
+}
+
+@Composable
+private fun SectionHeader(title: String, info: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        InfoIcon(title, info)
+    }
+}
+
+@Composable
+private fun InfoSwitch(
+    label: String,
+    info: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit
+) {
+    ListItem(
+        headlineContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(label)
+                InfoIcon(label, info)
+            }
+        },
+        trailingContent = { Switch(checked = checked, onCheckedChange = onChange) }
+    )
 }

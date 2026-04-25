@@ -138,7 +138,7 @@ class GitHubRepository @Inject constructor(
         if (r.isSuccessful) r.body() else null
     }
 
-    suspend fun setBranchProtection(owner: String, name: String, branch: String, body: UpdateBranchProtectionRequest) =
+    suspend fun setBranchProtection(owner: String, name: String, branch: String, body: kotlinx.serialization.json.JsonObject) =
         withContext(Dispatchers.IO) { api.setBranchProtection(owner, name, branch, body) }
 
     suspend fun removeBranchProtection(owner: String, name: String, branch: String) =

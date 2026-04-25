@@ -283,10 +283,19 @@ interface GitHubApi {
         @Path("owner") owner: String, @Path("repo") repo: String, @Path("branch") branch: String
     ): Response<BranchProtection>
 
+    /**
+     * GitHub's PUT branch-protection endpoint requires `required_status_checks`,
+     * `enforce_admins`, `required_pull_request_reviews`, and `restrictions` to
+     * be present in the body — even when their value is `null` — otherwise it
+     * responds with HTTP 422. Our global Json instance has `explicitNulls = false`
+     * which strips nullable fields from serialized objects, so we send a raw
+     * [JsonObject] here that the caller assembles with [buildJsonObject] to keep
+     * those keys explicit.
+     */
     @PUT("repos/{owner}/{repo}/branches/{branch}/protection")
     suspend fun setBranchProtection(
         @Path("owner") owner: String, @Path("repo") repo: String, @Path("branch") branch: String,
-        @Body body: UpdateBranchProtectionRequest
+        @Body body: kotlinx.serialization.json.JsonObject
     ): BranchProtection
 
     @DELETE("repos/{owner}/{repo}/branches/{branch}/protection")
