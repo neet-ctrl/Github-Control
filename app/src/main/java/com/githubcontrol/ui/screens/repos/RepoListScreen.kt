@@ -70,7 +70,9 @@ fun RepoListScreen(onBack: () -> Unit, onOpen: (String, String) -> Unit, onCreat
                     it.fullName.contains(s.search, true) ||
                     (it.description?.contains(s.search, true) ?: false)
             }
-            if (s.loading && s.repos.isEmpty()) { LoadingIndicator(); return@Column }
+            if (s.loading && s.repos.isEmpty()) {
+                LoadingIndicator()
+            } else {
             LazyColumn(state = listState, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(filtered, key = { it.id }) { r ->
                     GhCard(onClick = { onOpen(r.owner.login, r.name) }) {
@@ -97,6 +99,7 @@ fun RepoListScreen(onBack: () -> Unit, onOpen: (String, String) -> Unit, onCreat
                 }
                 if (s.loading) item { LoadingIndicator() }
                 if (s.endReached && filtered.isNotEmpty()) item { Text("End of list", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(12.dp)) }
+            }
             }
         }
 

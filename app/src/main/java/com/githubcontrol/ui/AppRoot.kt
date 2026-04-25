@@ -66,6 +66,8 @@ fun AppRoot() {
     val corner by am.cornerRadiusFlow.collectAsState(initial = 14)
     val terminal by am.terminalThemeFlow.collectAsState(initial = "github-dark")
     val onboardingDone by am.onboardingCompletedFlow.collectAsState(initial = true)
+    val addingAccount by main.addingAccount.collectAsState()
+    val lastRoute by am.lastRouteFlow.collectAsState(initial = null)
 
     val settings = ThemeSettings(
         mode = theme, accentKey = accent, dynamicColor = dynamic, amoled = amoled,
@@ -76,15 +78,26 @@ fun AppRoot() {
     GitHubControlTheme(settings = settings) {
         val nav = rememberNavController()
 
-        LaunchedEffect(state.loggedIn, state.locked, onboardingDone) {
+        LaunchedEffect(state.loggedIn, state.locked, onboardingDone, addingAccount) {
             val target = when {
                 !onboardingDone -> Routes.ONBOARDING
+                addingAccount -> Routes.LOGIN
                 !state.loggedIn -> Routes.LOGIN
                 state.locked -> Routes.BIOMETRIC
-                else -> Routes.DASHBOARD
+                else -> lastRoute ?: Routes.DASHBOARD
             }
-            if (nav.currentDestination?.route != target) {
+            val current = nav.currentDestination?.route
+            if (current != target && current?.substringBefore('/') != target.substringBefore('/')) {
                 nav.navigate(target) { popUpTo(0) { inclusive = true } }
+            }
+        }
+
+        LaunchedEffect(nav) {
+            nav.currentBackStackEntryFlow.collect { entry ->
+                val route = entry.destination.route ?: return@collect
+                if (route !in setOf(Routes.LOGIN, Routes.BIOMETRIC, Routes.ONBOARDING)) {
+                    am.setLastRoute(route)
+                }
             }
         }
 
@@ -96,7 +109,10 @@ fun AppRoot() {
                 })
             }
             composable(Routes.LOGIN) {
-                LoginScreen(main) { nav.navigate(Routes.DASHBOARD) { popUpTo(0) { inclusive = true } } }
+                LoginScreen(main) {
+                    main.endAddAccount()
+                    nav.navigate(Routes.DASHBOARD) { popUpTo(0) { inclusive = true } }
+                }
             }
             composable(Routes.BIOMETRIC) {
                 BiometricScreen(main) { nav.navigate(Routes.DASHBOARD) { popUpTo(0) { inclusive = true } } }
@@ -279,7 +295,8 @@ fun AppRoot() {
             }
             composable(Routes.ACCOUNTS) {
                 AccountsScreen(main, onBack = { nav.popBackStack() }, onAdd = {
-                    main.lock(); nav.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } }
+                    main.beginAddAccount()
+                    nav.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } }
                 })
             }
             composable(Routes.COMMAND) { CommandScreen(onBack = { nav.popBackStack() }) }

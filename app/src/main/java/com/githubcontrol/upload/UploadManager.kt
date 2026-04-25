@@ -9,18 +9,19 @@ import com.githubcontrol.data.repository.GitHubRepository
 import com.githubcontrol.notifications.Notifier
 import com.githubcontrol.utils.GitignoreMatcher
 import com.githubcontrol.utils.Logger
-import com.githubcontrol.utils.toBase64
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
+import android.util.Base64
+import android.util.Base64OutputStream
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
-enum class ConflictMode { OVERWRITE, SKIP, RENAME }
+enum class ConflictMode { OVERWRITE, SKIP, RENAME, REPLACE_FOLDER }
 enum class UploadFileState { PENDING, UPLOADING, DONE, SKIPPED, FAILED }
 
 data class UploadFile(
@@ -133,7 +134,27 @@ class UploadManager @Inject constructor(
         var bytesDone = 0L
         var done = 0
         _state.value = UploadProgress(job, job.files, "", 0, job.files.size, 0, 0.0, 0, true)
-        Logger.i("Upload", "${if (job.dryRun) "DRY-RUN " else ""}start ${job.owner}/${job.repo}@${job.branch} files=${job.files.size} bytes=${job.totalBytes}")
+        Logger.i("Upload", "${if (job.dryRun) "DRY-RUN " else ""}start ${job.owner}/${job.repo}@${job.branch} files=${job.files.size} bytes=${job.totalBytes} mode=${job.conflictMode}")
+
+        if (job.conflictMode == ConflictMode.REPLACE_FOLDER && !job.dryRun) {
+            try {
+                runReplaceFolder(job)
+                done = job.files.count { it.state == UploadFileState.DONE }
+                bytesDone = job.files.filter { it.state == UploadFileState.DONE }.sumOf { it.sizeBytes }
+                _state.value = _state.value.copy(
+                    files = job.files.toList(), uploaded = done, bytesDone = bytesDone,
+                    running = false, finished = true,
+                    error = if (job.files.any { it.state == UploadFileState.FAILED }) "Some files failed" else null
+                )
+                notifier.uploadDone(job.files.none { it.state == UploadFileState.FAILED }, "${done}/${job.files.size} files (folder replaced)")
+                return@withContext
+            } catch (t: Throwable) {
+                Logger.e("Upload", "REPLACE_FOLDER failed", t)
+                _state.value = _state.value.copy(running = false, finished = true, error = t.message ?: "Folder replace failed")
+                notifier.uploadDone(false, t.message ?: "Folder replace failed")
+                return@withContext
+            }
+        }
 
         for (uf in job.files) {
             if (cancelled) { Logger.w("Upload", "cancelled at ${uf.targetPath}"); break }
@@ -151,20 +172,19 @@ class UploadManager @Inject constructor(
                     _state.value = _state.value.copy(files = job.files.toList(), uploaded = done, bytesDone = bytesDone)
                     continue
                 }
-                val bytes = readUri(Uri.parse(uf.id)) ?: throw IllegalStateException("Cannot read")
-                val targetSha = if (job.conflictMode == ConflictMode.OVERWRITE) {
-                    runCatching { repo.fileContent(job.owner, job.repo, uf.targetPath, job.branch).sha }.getOrNull()
-                } else null
-
                 if (job.conflictMode == ConflictMode.SKIP) {
                     val exists = runCatching { repo.fileContent(job.owner, job.repo, uf.targetPath, job.branch) }.isSuccess
                     if (exists) { uf.state = UploadFileState.SKIPPED; done++; continue }
                 }
-
+                val targetSha = if (job.conflictMode == ConflictMode.OVERWRITE) {
+                    runCatching { repo.fileContent(job.owner, job.repo, uf.targetPath, job.branch).sha }.getOrNull()
+                } else null
                 val finalPath = if (job.conflictMode == ConflictMode.RENAME) renameIfExists(job.owner, job.repo, uf.targetPath, job.branch) else uf.targetPath
+
+                val b64 = streamBase64(Uri.parse(uf.id)) ?: throw IllegalStateException("Cannot read")
                 val req = PutFileRequest(
                     message = job.message,
-                    content = bytes.toBase64(),
+                    content = b64,
                     sha = targetSha,
                     branch = job.branch,
                     author = if (job.authorName != null && job.authorEmail != null)
@@ -239,6 +259,66 @@ class UploadManager @Inject constructor(
     }
 
     private fun readUri(uri: Uri): ByteArray? = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+
+    /**
+     * Stream the URI through a Base64 encoder so we never hold the raw bytes and
+     * the encoded string in memory at the same time. Required to avoid OOM on
+     * large uploads (the GitHub Contents API takes base64-encoded content).
+     */
+    private fun streamBase64(uri: Uri): String? {
+        val input = context.contentResolver.openInputStream(uri) ?: return null
+        return input.use { ins ->
+            val baos = ByteArrayOutputStream()
+            Base64OutputStream(baos, Base64.NO_WRAP).use { b64 ->
+                val buf = ByteArray(64 * 1024)
+                while (true) {
+                    val n = ins.read(buf)
+                    if (n <= 0) break
+                    b64.write(buf, 0, n)
+                }
+            }
+            baos.toString("US-ASCII")
+        }
+    }
+
+    /**
+     * Atomically replace the contents of [job.targetFolder]: deletes any existing
+     * files inside that folder that aren't being uploaded, then writes all of the
+     * new files in a single Git Data API commit.
+     */
+    private suspend fun runReplaceFolder(job: UploadJob) {
+        // 1. List existing files under the target folder (recursively).
+        val targetFolder = job.targetFolder.trim('/')
+        val existing: List<String> = runCatching {
+            val branchInfo = repo.api.branch(job.owner, job.repo, job.branch)
+            val parent = repo.api.commitDetail(job.owner, job.repo, branchInfo.commit.sha)
+            val ft = repo.api.gitTree(job.owner, job.repo, parent.commit.tree.sha, recursive = 1)
+            ft.tree.filter { it.type == "blob" && (targetFolder.isEmpty() || it.path.startsWith("$targetFolder/")) }
+                .map { it.path }
+        }.getOrElse { emptyList() }
+
+        val newPaths = job.files.map { it.targetPath.trim('/') }.toSet()
+        val toDelete = existing.filterNot { it in newPaths }
+
+        // 2. Build commitFiles list (deletes + adds). Use ByteArray? = null for deletes.
+        val ops = mutableListOf<Pair<String, ByteArray?>>()
+        for (path in toDelete) ops += path to null
+        for (uf in job.files) {
+            try {
+                val bytes = readUri(Uri.parse(uf.id)) ?: throw IllegalStateException("Cannot read")
+                ops += uf.targetPath to bytes
+                uf.state = UploadFileState.DONE
+                uf.bytesDone = uf.sizeBytes
+            } catch (t: Throwable) {
+                uf.state = UploadFileState.FAILED
+                uf.error = t.message
+                Logger.e("Upload", "FAIL read ${uf.targetPath}", t)
+            }
+        }
+        // 3. Single atomic commit.
+        repo.commitFiles(job.owner, job.repo, job.branch, ops, job.message, job.authorName, job.authorEmail)
+        Logger.i("Upload", "REPLACE_FOLDER committed: deleted=${toDelete.size} added=${job.files.size}")
+    }
 
     private fun joinPath(base: String, name: String): String {
         val b = base.trim('/')

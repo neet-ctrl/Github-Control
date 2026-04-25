@@ -38,27 +38,30 @@ fun CommitDetailScreen(owner: String, name: String, sha: String, onBack: () -> U
                 FilterChip(selected = s.sideBySide, onClick = { vm.toggleSideBySide() }, label = { Text("split") })
             })
     }) { pad ->
-        if (s.loading) { LoadingIndicator(); return@Scaffold }
-        val c = s.commit ?: return@Scaffold
-        Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            GhCard {
-                Text(c.commit.message, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
-                Text("${c.commit.author.name} <${c.commit.author.email}>", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(2.dp))
-                Text("+${c.stats?.additions ?: 0} −${c.stats?.deletions ?: 0} (${c.files?.size ?: 0} files)", style = MaterialTheme.typography.labelMedium)
-            }
-            (c.files ?: emptyList()).forEach { f ->
+        val c = s.commit
+        when {
+            s.loading -> Box(Modifier.padding(pad).fillMaxSize()) { LoadingIndicator() }
+            c == null -> Box(Modifier.padding(pad).fillMaxSize()) { Text("No commit data", modifier = Modifier.padding(16.dp)) }
+            else -> Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 GhCard {
-                    Text(f.filename, style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.height(4.dp))
-                    Text("+${f.additions} −${f.deletions} • ${f.status}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(c.commit.message, style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
-                    val parsed = remember(f.patch, s.ignoreWhitespace) {
-                        val raw = Diff.parse(f.patch)
-                        if (s.ignoreWhitespace) Diff.ignoreWhitespace(raw) else raw
+                    Text("${c.commit.author.name} <${c.commit.author.email}>", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(2.dp))
+                    Text("+${c.stats?.additions ?: 0} −${c.stats?.deletions ?: 0} (${c.files?.size ?: 0} files)", style = MaterialTheme.typography.labelMedium)
+                }
+                (c.files ?: emptyList()).forEach { f ->
+                    GhCard {
+                        Text(f.filename, style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.height(4.dp))
+                        Text("+${f.additions} −${f.deletions} • ${f.status}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(8.dp))
+                        val parsed = remember(f.patch, s.ignoreWhitespace) {
+                            val raw = Diff.parse(f.patch)
+                            if (s.ignoreWhitespace) Diff.ignoreWhitespace(raw) else raw
+                        }
+                        DiffBlock(parsed, sideBySide = s.sideBySide)
                     }
-                    DiffBlock(parsed, sideBySide = s.sideBySide)
                 }
             }
         }

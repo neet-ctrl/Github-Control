@@ -30,17 +30,22 @@ fun CommitsScreen(owner: String, name: String, branch: String, onBack: () -> Uni
         TopAppBar(title = { Text("Commits • ${branch.ifBlank { "default" }}") },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } })
     }) { pad ->
-        if (s.loading && s.commits.isEmpty()) { LoadingIndicator(); return@Scaffold }
-        s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
-        LazyColumn(state = listState, modifier = Modifier.padding(pad), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(s.commits, key = { it.sha }) { c ->
-                GhCard(onClick = { onOpenCommit(c.sha) }) {
-                    Text(c.commit.message.lineSequence().firstOrNull() ?: c.commit.message, style = MaterialTheme.typography.titleMedium, maxLines = 2)
-                    Spacer(Modifier.height(4.dp))
-                    Text("${c.commit.author.name} • ${RelativeTime.ago(c.commit.author.date)} • ${c.sha.take(7)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.padding(pad).fillMaxSize()) {
+            if (s.loading && s.commits.isEmpty()) {
+                LoadingIndicator()
+            } else {
+                s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
+                LazyColumn(state = listState, contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(s.commits, key = { it.sha }) { c ->
+                        GhCard(onClick = { onOpenCommit(c.sha) }) {
+                            Text(c.commit.message.lineSequence().firstOrNull() ?: c.commit.message, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                            Spacer(Modifier.height(4.dp))
+                            Text("${c.commit.author.name} • ${RelativeTime.ago(c.commit.author.date)} • ${c.sha.take(7)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (s.loading) item { LoadingIndicator() }
                 }
             }
-            if (s.loading) item { LoadingIndicator() }
         }
     }
 }

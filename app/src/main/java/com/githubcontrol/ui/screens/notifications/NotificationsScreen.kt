@@ -25,7 +25,9 @@ fun NotificationsScreen(onBack: () -> Unit, vm: NotificationsViewModel = hiltVie
         TopAppBar(title = { Text("Notifications") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
             actions = { FilterChip(selected = s.all, onClick = { vm.toggleAll() }, label = { Text(if (s.all) "All" else "Unread") }) })
     }) { pad ->
-        if (s.loading) { LoadingIndicator(); return@Scaffold }
+        if (s.loading) {
+            Box(Modifier.padding(pad).fillMaxSize()) { LoadingIndicator() }
+        } else {
         LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(s.items, key = { it.id }) { n ->
                 GhCard {
@@ -39,6 +41,7 @@ fun NotificationsScreen(onBack: () -> Unit, vm: NotificationsViewModel = hiltVie
                     }
                 }
             }
+        }
         }
     }
 }

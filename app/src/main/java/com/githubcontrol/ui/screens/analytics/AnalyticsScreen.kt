@@ -23,7 +23,9 @@ fun AnalyticsScreen(owner: String, name: String, onBack: () -> Unit, vm: Analyti
     LaunchedEffect(owner, name) { vm.load(owner, name) }
     val s by vm.state.collectAsState()
     Scaffold(topBar = { TopAppBar(title = { Text("Analytics") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } }) }) { pad ->
-        if (s.loading) { LoadingIndicator(); return@Scaffold }
+        if (s.loading) {
+            Box(Modifier.padding(pad).fillMaxSize()) { LoadingIndicator() }
+        } else {
         Column(Modifier.padding(pad).fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             GhCard {
                 Text("API Rate Limit", style = MaterialTheme.typography.titleMedium)
@@ -54,6 +56,7 @@ fun AnalyticsScreen(owner: String, name: String, onBack: () -> Unit, vm: Analyti
                     }
                 }
             }
+        }
         }
     }
 }

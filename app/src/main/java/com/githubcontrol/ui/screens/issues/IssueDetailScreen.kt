@@ -28,8 +28,11 @@ fun IssueDetailScreen(owner: String, name: String, number: Int, onBack: () -> Un
         TopAppBar(title = { Text("Issue #$number") },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } })
     }) { pad ->
-        if (s.loading) { LoadingIndicator(); return@Scaffold }
-        val i = s.issue ?: return@Scaffold
+        val i = s.issue
+        when {
+            s.loading -> Box(Modifier.padding(pad).fillMaxSize()) { LoadingIndicator() }
+            i == null -> Box(Modifier.padding(pad).fillMaxSize()) { Text("Loading…", modifier = Modifier.padding(16.dp)) }
+            else ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             GhCard {
                 Text(i.title, style = MaterialTheme.typography.titleLarge)
@@ -60,6 +63,7 @@ fun IssueDetailScreen(owner: String, name: String, number: Int, onBack: () -> Un
             }
             s.message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        }
         }
     }
 }

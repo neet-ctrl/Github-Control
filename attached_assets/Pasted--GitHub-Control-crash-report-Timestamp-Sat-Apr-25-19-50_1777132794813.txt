@@ -1,0 +1,168 @@
+# GitHub Control crash report
+Timestamp:   Sat Apr 25 19:50:06 GMT+05:30 2026  (epoch=1777126806539)
+Type:        uncaught
+Thread:      main (id=2, prio=5)
+Exception:   androidx.compose.runtime.ComposeRuntimeError: Compose Runtime internal error. Unexpected or incorrect use of the Compose internal runtime API (Start/end imbalance). Please report to Google or use https://goo.gle/compose-feedback
+
+# Device
+Brand:       Infinix
+Model:       Infinix X6857B
+Manufacturer:INFINIX
+Product:     X6857B-IN
+Android:     15 (sdk 35)
+ABI:         arm64-v8a
+App version: 1.0.0
+
+# Stack trace
+androidx.compose.runtime.ComposeRuntimeError: Compose Runtime internal error. Unexpected or incorrect use of the Compose internal runtime API (Start/end imbalance). Please report to Google or use https://goo.gle/compose-feedback
+	at androidx.compose.runtime.ComposerKt.composeImmediateRuntimeError(Composer.kt:4574)
+	at androidx.compose.runtime.ComposerImpl.finalizeCompose(Composer.kt:4899)
+	at androidx.compose.runtime.ComposerImpl.endRoot(Composer.kt:1671)
+	at androidx.compose.runtime.ComposerImpl.doCompose(Composer.kt:3610)
+	at androidx.compose.runtime.ComposerImpl.recompose$runtime_release(Composer.kt:3552)
+	at androidx.compose.runtime.CompositionImpl.recompose(Composition.kt:948)
+	at androidx.compose.runtime.Recomposer.performRecompose(Recomposer.kt:1206)
+	at androidx.compose.runtime.Recomposer.access$performRecompose(Recomposer.kt:132)
+	at androidx.compose.runtime.Recomposer$runRecomposeAndApplyChanges$2$1.invoke(Recomposer.kt:616)
+	at androidx.compose.runtime.Recomposer$runRecomposeAndApplyChanges$2$1.invoke(Recomposer.kt:585)
+	at androidx.compose.ui.platform.AndroidUiFrameClock$withFrameNanos$2$callback$1.doFrame(AndroidUiFrameClock.android.kt:41)
+	at androidx.compose.ui.platform.AndroidUiDispatcher.performFrameDispatch(AndroidUiDispatcher.android.kt:109)
+	at androidx.compose.ui.platform.AndroidUiDispatcher.access$performFrameDispatch(AndroidUiDispatcher.android.kt:41)
+	at androidx.compose.ui.platform.AndroidUiDispatcher$dispatchCallback$1.doFrame(AndroidUiDispatcher.android.kt:69)
+	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1608)
+	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1619)
+	at android.view.Choreographer.doCallbacks(Choreographer.java:1159)
+	at android.view.Choreographer.doFrame(Choreographer.java:1045)
+	at android.view.Choreographer$FrameDisplayEventReceiver.run(Choreographer.java:1578)
+	at android.os.Handler.handleCallback(Handler.java:959)
+	at android.os.Handler.dispatchMessage(Handler.java:100)
+	at android.os.Looper.loopOnce(Looper.java:311)
+	at android.os.Looper.loop(Looper.java:408)
+	at android.app.ActivityThread.main(ActivityThread.java:9119)
+	at java.lang.reflect.Method.invoke(Native Method)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:627)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:970)
+	Suppressed: kotlinx.coroutines.internal.DiagnosticCoroutineContextException: [androidx.compose.runtime.PausableMonotonicFrameClock@97e7335, androidx.compose.ui.platform.MotionDurationScaleImpl@1ef63ca, StandaloneCoroutine{Cancelling}@b91393b, AndroidUiDispatcher@ae78858]
+
+# Recent in-app log (last 200 entries)
+19:48:07.341  INFO  [CrashHandler      ] installed → /data/user/0/com.githubcontrol/files/crashes
+19:48:07.343  INFO  [WidgetCtl         ] started — observing upload state
+19:48:07.344  INFO  [App               ] GitHub Control starting v1.0.0
+19:48:09.450  NET   [HTTP              ] → GET /user
+19:48:10.199  NET   [HTTP              ] ← 200 GET /user  749ms  rl=4831
+19:48:10.216  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+19:48:10.668  NET   [HTTP              ] ← 200 GET /user/repos  452ms  rl=4830
+19:48:10.679  NET   [HTTP              ] → GET /rate_limit
+19:48:10.992  NET   [HTTP              ] ← 200 GET /rate_limit  314ms  rl=4837
+19:48:11.000  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+19:48:11.468  NET   [HTTP              ] ← 200 GET /notifications  468ms  rl=4829
+19:48:15.055  NET   [HTTP              ] → GET /user
+19:48:15.455  NET   [HTTP              ] ← 200 GET /user  399ms  rl=4828
+19:48:15.474  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+19:48:15.872  NET   [HTTP              ] ← 200 GET /user/repos  398ms  rl=4827
+19:48:15.888  NET   [HTTP              ] → GET /rate_limit
+19:48:16.258  NET   [HTTP              ] ← 200 GET /rate_limit  370ms  rl=4837
+19:48:16.270  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+19:48:16.745  NET   [HTTP              ] ← 200 GET /notifications  475ms  rl=4826
+19:48:38.524  NET   [HTTP              ] → GET /user
+19:48:38.896  NET   [HTTP              ] ← 200 GET /user  372ms  rl=4825
+19:48:38.901  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+19:48:39.452  NET   [HTTP              ] ← 200 GET /user/repos  551ms  rl=4824
+19:48:39.463  NET   [HTTP              ] → GET /rate_limit
+19:48:39.773  NET   [HTTP              ] ← 200 GET /rate_limit  310ms  rl=4837
+19:48:39.783  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+19:48:40.262  NET   [HTTP              ] ← 200 GET /notifications  479ms  rl=4823
+19:48:47.223  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing
+19:48:47.617  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing  394ms  rl=4836
+19:48:47.642  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testing
+19:48:48.092  NET   [HTTP              ] ← 404 GET /user/starred/kumaritkahs-max/testing  450ms  rl=4835
+19:48:48.103  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches?per_page=100
+19:48:48.488  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/branches  386ms  rl=4822
+19:48:48.517  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/contributors?per_page=30
+19:48:49.054  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/contributors  537ms  rl=4821
+19:48:49.082  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/languages
+19:48:49.467  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/languages  385ms  rl=4820
+19:48:51.281  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/actions/workflows
+19:48:51.640  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/actions/workflows  360ms  rl=4834
+19:48:51.666  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/actions/runs?per_page=30&page=1
+19:48:52.095  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/actions/runs  429ms  rl=4819
+19:48:53.109  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing
+19:48:53.506  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing  397ms  rl=4833
+19:48:53.521  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testing
+19:48:54.332  NET   [HTTP              ] ← 404 GET /user/starred/kumaritkahs-max/testing  811ms  rl=4832
+19:48:54.345  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches?per_page=100
+19:48:54.760  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/branches  415ms  rl=4818
+19:48:54.779  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/contributors?per_page=30
+19:48:55.296  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/contributors  517ms  rl=4817
+19:48:55.315  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/languages
+19:48:55.691  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/languages  376ms  rl=4816
+19:48:56.012  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches?per_page=100
+19:48:56.461  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/branches  450ms  rl=4815
+19:49:00.342  NET   [HTTP              ] → POST /repos/kumaritkahs-max/testing/branches/hello/rename
+19:49:01.053  NET   [HTTP              ] ← 201 POST /repos/kumaritkahs-max/testing/branches/hello/rename  711ms  rl=4831
+19:49:01.067  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches?per_page=100
+19:49:01.535  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/branches  468ms  rl=4830
+19:49:05.643  NET   [HTTP              ] → DELETE /repos/kumaritkahs-max/testing/git/refs/heads/hello
+19:49:06.009  NET   [HTTP              ] ← 422 DELETE /repos/kumaritkahs-max/testing/git/refs/heads/hello  366ms  rl=4829
+19:49:06.037  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches?per_page=100
+19:49:06.508  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/branches  471ms  rl=4814
+19:49:07.266  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing
+19:49:07.671  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing  405ms  rl=4828
+19:49:07.692  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testing
+19:49:08.068  NET   [HTTP              ] ← 404 GET /user/starred/kumaritkahs-max/testing  376ms  rl=4827
+19:49:08.085  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches?per_page=100
+19:49:08.576  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/branches  491ms  rl=4813
+19:49:08.589  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/contributors?per_page=30
+19:49:09.056  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/contributors  468ms  rl=4812
+19:49:09.078  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/languages
+19:49:09.533  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/languages  455ms  rl=4811
+19:49:10.336  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/readme?ref=main
+19:49:10.817  NET   [HTTP              ] ← 404 GET /repos/kumaritkahs-max/testing/readme  481ms  rl=4826
+19:49:11.652  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing
+19:49:12.093  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing  441ms  rl=4825
+19:49:12.110  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testing
+19:49:12.428  NET   [HTTP              ] ← 404 GET /user/starred/kumaritkahs-max/testing  318ms  rl=4824
+19:49:12.445  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches?per_page=100
+19:49:12.900  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/branches  455ms  rl=4810
+19:49:12.919  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/contributors?per_page=30
+19:49:13.321  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/contributors  401ms  rl=4809
+19:49:13.342  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/languages
+19:49:13.513  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/contents?ref=main
+19:49:13.702  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/languages  360ms  rl=4808
+19:49:13.856  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/contents  343ms  rl=4823
+19:49:13.868  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches?per_page=100
+19:49:14.319  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/branches  451ms  rl=4807
+19:49:15.563  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/contents/testing?ref=main
+19:49:15.937  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/contents/testing  374ms  rl=4822
+19:49:15.961  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches?per_page=100
+19:49:16.423  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/branches  462ms  rl=4806
+19:49:18.450  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/contents?ref=main
+19:49:18.813  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/contents  363ms  rl=4821
+19:49:18.991  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing
+19:49:19.383  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing  392ms  rl=4820
+19:49:19.401  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testing
+19:49:19.726  NET   [HTTP              ] ← 404 GET /user/starred/kumaritkahs-max/testing  325ms  rl=4819
+19:49:19.750  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches?per_page=100
+19:49:20.259  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/branches  509ms  rl=4805
+19:49:20.269  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/contributors?per_page=30
+19:49:20.626  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/contributors  357ms  rl=4804
+19:49:20.635  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/languages
+19:49:21.052  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/languages  417ms  rl=4803
+19:49:24.023  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches/main/protection
+19:49:24.776  NET   [HTTP              ] ← 404 GET /repos/kumaritkahs-max/testing/branches/main/protection  753ms  rl=4802
+19:49:33.923  NET   [HTTP              ] → PUT /repos/kumaritkahs-max/testing/branches/main/protection
+19:49:34.336  NET   [HTTP              ] ← 422 PUT /repos/kumaritkahs-max/testing/branches/main/protection  413ms  rl=4818
+19:49:34.351  ERROR [BranchProtection  ] save failed :: HttpException: HTTP 422 
+19:49:40.085  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing
+19:49:40.572  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing  487ms  rl=4817
+19:49:40.577  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testing
+19:49:40.891  NET   [HTTP              ] ← 404 GET /user/starred/kumaritkahs-max/testing  314ms  rl=4816
+19:49:40.896  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches?per_page=100
+19:49:41.372  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/branches  476ms  rl=4801
+19:49:41.376  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/contributors?per_page=30
+19:49:41.763  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/contributors  387ms  rl=4800
+19:49:41.767  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/languages
+19:49:42.171  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/languages  404ms  rl=4799
+19:50:03.463  NET   [HTTP              ] → PUT /user/starred/kumaritkahs-max/testing
+19:50:03.936  NET   [HTTP              ] ← 204 PUT /user/starred/kumaritkahs-max/testing  473ms  rl=4815
+19:50:06.537  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/pulls?state=open&sort=created&direction=desc&per_page=30&page=1

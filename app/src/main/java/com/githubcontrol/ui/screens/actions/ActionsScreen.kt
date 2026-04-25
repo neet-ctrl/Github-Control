@@ -27,7 +27,9 @@ fun ActionsScreen(owner: String, name: String, onBack: () -> Unit, vm: ActionsVi
     var ref by remember { mutableStateOf("main") }
 
     Scaffold(topBar = { TopAppBar(title = { Text("Actions") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } }) }) { pad ->
-        if (s.loading) { LoadingIndicator(); return@Scaffold }
+        if (s.loading) {
+            Box(Modifier.padding(pad).fillMaxSize()) { LoadingIndicator() }
+        } else {
         Column(Modifier.padding(pad).fillMaxSize().padding(12.dp)) {
             Text("Workflows", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
@@ -71,6 +73,7 @@ fun ActionsScreen(owner: String, name: String, onBack: () -> Unit, vm: ActionsVi
                 confirmButton = { TextButton(onClick = { vm.dispatch(owner, name, dispatchTarget!!, ref); dispatchTarget = null }) { Text("Run") } },
                 dismissButton = { TextButton(onClick = { dispatchTarget = null }) { Text("Cancel") } }
             )
+        }
         }
     }
 }

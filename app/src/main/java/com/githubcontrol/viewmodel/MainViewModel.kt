@@ -42,6 +42,12 @@ class MainViewModel @Inject constructor(
     private val _loginBusy = MutableStateFlow(false)
     val loginBusy: StateFlow<Boolean> = _loginBusy.asStateFlow()
 
+    private val _addingAccount = MutableStateFlow(false)
+    val addingAccount: StateFlow<Boolean> = _addingAccount.asStateFlow()
+
+    fun beginAddAccount() { _addingAccount.value = true }
+    fun endAddAccount() { _addingAccount.value = false }
+
     init { refresh() }
 
     fun refresh() {

@@ -1,0 +1,81 @@
+# GitHub Control crash report
+Timestamp:   Sat Apr 25 19:50:21 GMT+05:30 2026  (epoch=1777126821296)
+Type:        uncaught
+Thread:      main (id=2, prio=5)
+Exception:   androidx.compose.runtime.ComposeRuntimeError: Compose Runtime internal error. Unexpected or incorrect use of the Compose internal runtime API (Start/end imbalance). Please report to Google or use https://goo.gle/compose-feedback
+
+# Device
+Brand:       Infinix
+Model:       Infinix X6857B
+Manufacturer:INFINIX
+Product:     X6857B-IN
+Android:     15 (sdk 35)
+ABI:         arm64-v8a
+App version: 1.0.0
+
+# Stack trace
+androidx.compose.runtime.ComposeRuntimeError: Compose Runtime internal error. Unexpected or incorrect use of the Compose internal runtime API (Start/end imbalance). Please report to Google or use https://goo.gle/compose-feedback
+	at androidx.compose.runtime.ComposerKt.composeImmediateRuntimeError(Composer.kt:4574)
+	at androidx.compose.runtime.ComposerImpl.finalizeCompose(Composer.kt:4899)
+	at androidx.compose.runtime.ComposerImpl.endRoot(Composer.kt:1671)
+	at androidx.compose.runtime.ComposerImpl.doCompose(Composer.kt:3610)
+	at androidx.compose.runtime.ComposerImpl.recompose$runtime_release(Composer.kt:3552)
+	at androidx.compose.runtime.CompositionImpl.recompose(Composition.kt:948)
+	at androidx.compose.runtime.Recomposer.performRecompose(Recomposer.kt:1206)
+	at androidx.compose.runtime.Recomposer.access$performRecompose(Recomposer.kt:132)
+	at androidx.compose.runtime.Recomposer$runRecomposeAndApplyChanges$2$1.invoke(Recomposer.kt:616)
+	at androidx.compose.runtime.Recomposer$runRecomposeAndApplyChanges$2$1.invoke(Recomposer.kt:585)
+	at androidx.compose.ui.platform.AndroidUiFrameClock$withFrameNanos$2$callback$1.doFrame(AndroidUiFrameClock.android.kt:41)
+	at androidx.compose.ui.platform.AndroidUiDispatcher.performFrameDispatch(AndroidUiDispatcher.android.kt:109)
+	at androidx.compose.ui.platform.AndroidUiDispatcher.access$performFrameDispatch(AndroidUiDispatcher.android.kt:41)
+	at androidx.compose.ui.platform.AndroidUiDispatcher$dispatchCallback$1.doFrame(AndroidUiDispatcher.android.kt:69)
+	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1608)
+	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1619)
+	at android.view.Choreographer.doCallbacks(Choreographer.java:1159)
+	at android.view.Choreographer.doFrame(Choreographer.java:1045)
+	at android.view.Choreographer$FrameDisplayEventReceiver.run(Choreographer.java:1578)
+	at android.os.Handler.handleCallback(Handler.java:959)
+	at android.os.Handler.dispatchMessage(Handler.java:100)
+	at android.os.Looper.loopOnce(Looper.java:311)
+	at android.os.Looper.loop(Looper.java:408)
+	at android.app.ActivityThread.main(ActivityThread.java:9119)
+	at java.lang.reflect.Method.invoke(Native Method)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:627)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:970)
+	Suppressed: kotlinx.coroutines.internal.DiagnosticCoroutineContextException: [androidx.compose.runtime.PausableMonotonicFrameClock@9ad9213, androidx.compose.ui.platform.MotionDurationScaleImpl@f1b2c50, StandaloneCoroutine{Cancelling}@bf26e49, AndroidUiDispatcher@949634e]
+
+# Recent in-app log (last 200 entries)
+19:50:07.783  INFO  [CrashHandler      ] installed → /data/user/0/com.githubcontrol/files/crashes
+19:50:07.785  INFO  [WidgetCtl         ] started — observing upload state
+19:50:07.785  INFO  [App               ] GitHub Control starting v1.0.0
+19:50:09.565  NET   [HTTP              ] → GET /user
+19:50:10.197  NET   [HTTP              ] ← 200 GET /user  631ms  rl=4798
+19:50:10.216  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+19:50:10.647  NET   [HTTP              ] ← 200 GET /user/repos  431ms  rl=4797
+19:50:10.654  NET   [HTTP              ] → GET /rate_limit
+19:50:10.952  NET   [HTTP              ] ← 200 GET /rate_limit  298ms  rl=4814
+19:50:10.960  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+19:50:11.465  NET   [HTTP              ] ← 200 GET /notifications  506ms  rl=4796
+19:50:12.778  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox
+19:50:13.235  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/Smart-Toolbox  457ms  rl=4813
+19:50:13.256  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/Smart-Toolbox
+19:50:13.568  NET   [HTTP              ] ← 404 GET /user/starred/kumaritkahs-max/Smart-Toolbox  312ms  rl=4812
+19:50:13.588  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox/branches?per_page=100
+19:50:14.010  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/Smart-Toolbox/branches  423ms  rl=4795
+19:50:14.027  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox/contributors?per_page=30
+19:50:14.384  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/Smart-Toolbox/contributors  356ms  rl=4794
+19:50:14.412  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox/languages
+19:50:14.815  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/Smart-Toolbox/languages  403ms  rl=4793
+19:50:17.250  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox/commits?sha=main&per_page=30&page=1
+19:50:17.868  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/Smart-Toolbox/commits  618ms  rl=4792
+19:50:18.476  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox
+19:50:18.992  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/Smart-Toolbox  516ms  rl=4811
+19:50:19.012  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/Smart-Toolbox
+19:50:19.351  NET   [HTTP              ] ← 404 GET /user/starred/kumaritkahs-max/Smart-Toolbox  339ms  rl=4810
+19:50:19.364  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox/branches?per_page=100
+19:50:19.789  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/Smart-Toolbox/branches  425ms  rl=4791
+19:50:19.805  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox/contributors?per_page=30
+19:50:20.163  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/Smart-Toolbox/contributors  357ms  rl=4790
+19:50:20.173  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox/languages
+19:50:20.538  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/Smart-Toolbox/languages  365ms  rl=4789
+19:50:21.290  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox/branches/main

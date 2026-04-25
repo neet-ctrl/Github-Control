@@ -56,10 +56,15 @@ fun RepoDetailScreen(
             )
         }
     ) { pad ->
-        if (s.loading && s.repo == null) { LoadingIndicator(); return@Scaffold }
-        s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
-        val r = s.repo ?: return@Scaffold
+        val r = s.repo
+        when {
+            s.loading && r == null -> Box(Modifier.padding(pad).fillMaxSize()) { LoadingIndicator() }
+            r == null -> Box(Modifier.padding(pad).fillMaxSize()) {
+                Text(s.error ?: "Repository unavailable", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
+            }
+            else ->
         Column(Modifier.padding(pad).padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             GhCard {
                 Text(r.fullName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 if (r.description != null) Text(r.description!!, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -193,6 +198,7 @@ fun RepoDetailScreen(
                 LaunchedEffect(s.actionMessage) { /* could surface as snackbar */ }
                 Text(s.actionMessage!!, color = MaterialTheme.colorScheme.primary)
             }
+        }
         }
     }
 

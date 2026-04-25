@@ -1,0 +1,67 @@
+GitHub Control crash report
+Timestamp:   Sat Apr 25 19:50:52 GMT+05:30 2026  (epoch=1777126852870)
+Type:        uncaught
+Thread:      main (id=2, prio=5)
+Exception:   androidx.compose.runtime.ComposeRuntimeError: Compose Runtime internal error. Unexpected or incorrect use of the Compose internal runtime API (Start/end imbalance). Please report to Google or use https://goo.gle/compose-feedback
+
+# Device
+Brand:       Infinix
+Model:       Infinix X6857B
+Manufacturer:INFINIX
+Product:     X6857B-IN
+Android:     15 (sdk 35)
+ABI:         arm64-v8a
+App version: 1.0.0
+
+# Stack trace
+androidx.compose.runtime.ComposeRuntimeError: Compose Runtime internal error. Unexpected or incorrect use of the Compose internal runtime API (Start/end imbalance). Please report to Google or use https://goo.gle/compose-feedback
+	at androidx.compose.runtime.ComposerKt.composeImmediateRuntimeError(Composer.kt:4574)
+	at androidx.compose.runtime.ComposerImpl.finalizeCompose(Composer.kt:4899)
+	at androidx.compose.runtime.ComposerImpl.endRoot(Composer.kt:1671)
+	at androidx.compose.runtime.ComposerImpl.doCompose(Composer.kt:3610)
+	at androidx.compose.runtime.ComposerImpl.recompose$runtime_release(Composer.kt:3552)
+	at androidx.compose.runtime.CompositionImpl.recompose(Composition.kt:948)
+	at androidx.compose.runtime.Recomposer.performRecompose(Recomposer.kt:1206)
+	at androidx.compose.runtime.Recomposer.access$performRecompose(Recomposer.kt:132)
+	at androidx.compose.runtime.Recomposer$runRecomposeAndApplyChanges$2$1.invoke(Recomposer.kt:616)
+	at androidx.compose.runtime.Recomposer$runRecomposeAndApplyChanges$2$1.invoke(Recomposer.kt:585)
+	at androidx.compose.ui.platform.AndroidUiFrameClock$withFrameNanos$2$callback$1.doFrame(AndroidUiFrameClock.android.kt:41)
+	at androidx.compose.ui.platform.AndroidUiDispatcher.performFrameDispatch(AndroidUiDispatcher.android.kt:109)
+	at androidx.compose.ui.platform.AndroidUiDispatcher.access$performFrameDispatch(AndroidUiDispatcher.android.kt:41)
+	at androidx.compose.ui.platform.AndroidUiDispatcher$dispatchCallback$1.doFrame(AndroidUiDispatcher.android.kt:69)
+	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1608)
+	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1619)
+	at android.view.Choreographer.doCallbacks(Choreographer.java:1159)
+	at android.view.Choreographer.doFrame(Choreographer.java:1045)
+	at android.view.Choreographer$FrameDisplayEventReceiver.run(Choreographer.java:1578)
+	at android.os.Handler.handleCallback(Handler.java:959)
+	at android.os.Handler.dispatchMessage(Handler.java:100)
+	at android.os.Looper.loopOnce(Looper.java:311)
+	at android.os.Looper.loop(Looper.java:408)
+	at android.app.ActivityThread.main(ActivityThread.java:9119)
+	at java.lang.reflect.Method.invoke(Native Method)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:627)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:970)
+	Suppressed: kotlinx.coroutines.internal.DiagnosticCoroutineContextException: [androidx.compose.runtime.PausableMonotonicFrameClock@8eaa677, androidx.compose.ui.platform.MotionDurationScaleImpl@1ab52e4, StandaloneCoroutine{Cancelling}@98bf34d, AndroidUiDispatcher@f463e02]
+
+# Recent in-app log (last 200 entries)
+19:50:34.878  INFO  [CrashHandler      ] installed → /data/user/0/com.githubcontrol/files/crashes
+19:50:34.879  INFO  [WidgetCtl         ] started — observing upload state
+19:50:34.879  INFO  [App               ] GitHub Control starting v1.0.0
+19:50:36.851  NET   [HTTP              ] → GET /user
+19:50:37.478  NET   [HTTP              ] ← 200 GET /user  627ms  rl=4784
+19:50:37.496  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+19:50:37.895  NET   [HTTP              ] ← 200 GET /user/repos  398ms  rl=4783
+19:50:37.912  NET   [HTTP              ] → GET /rate_limit
+19:50:38.222  NET   [HTTP              ] ← 200 GET /rate_limit  310ms  rl=4810
+19:50:38.239  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+19:50:38.629  NET   [HTTP              ] ← 200 GET /notifications  390ms  rl=4782
+19:50:45.437  NET   [HTTP              ] → GET /user
+19:50:45.917  NET   [HTTP              ] ← 200 GET /user  480ms  rl=4781
+19:50:45.933  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+19:50:46.337  NET   [HTTP              ] ← 200 GET /user/repos  404ms  rl=4780
+19:50:46.359  NET   [HTTP              ] → GET /rate_limit
+19:50:46.731  NET   [HTTP              ] ← 200 GET /rate_limit  372ms  rl=4810
+19:50:46.745  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+19:50:47.203  NET   [HTTP              ] ← 200 GET /notifications  458ms  rl=4779
+19:50:52.847  NET   [HTTP              ] → GET /search/repositories?q=tes&order=desc&per_page=30&page=1

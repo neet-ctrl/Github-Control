@@ -70,14 +70,16 @@ class ProfileEditViewModel @Inject constructor(private val repo: GitHubRepositor
         // Send only what actually changed so we don't trip GitHub's "you are not allowed to
         // change `hireable`" or similar restrictions when the field is left untouched.
         val o = f.original
+        // GitHub treats explicit "" as "clear this field", but rejects null on some fields with 422.
+        // Send the actual edited string (including "") for any field the user touched; leave others as null.
         val req = UpdateUserRequest(
-            name = if (f.name != o.name) f.name.ifBlank { null } else null,
-            email = if (f.email != o.email) f.email.ifBlank { null } else null,
-            blog = if (f.blog != o.blog) f.blog.ifBlank { null } else null,
-            bio = if (f.bio != o.bio) f.bio.ifBlank { null } else null,
-            company = if (f.company != o.company) f.company.ifBlank { null } else null,
-            location = if (f.location != o.location) f.location.ifBlank { null } else null,
-            twitterUsername = if (f.twitter != o.twitter) f.twitter.ifBlank { null } else null,
+            name = if (f.name != o.name) f.name else null,
+            email = if (f.email != o.email) f.email else null,
+            blog = if (f.blog != o.blog) f.blog else null,
+            bio = if (f.bio != o.bio) f.bio else null,
+            company = if (f.company != o.company) f.company else null,
+            location = if (f.location != o.location) f.location else null,
+            twitterUsername = if (f.twitter != o.twitter) f.twitter else null,
             hireable = if (f.hireable != o.hireable) f.hireable else null
         )
         if (req.name == null && req.email == null && req.blog == null && req.bio == null
@@ -113,7 +115,9 @@ fun ProfileEditScreen(onBack: () -> Unit, vm: ProfileEditViewModel = hiltViewMod
         TopAppBar(title = { Text("Edit profile") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } })
     }) { pad ->
         Column(Modifier.padding(pad).padding(12.dp).fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (f.loading) { LinearProgressIndicator(Modifier.fillMaxWidth()); return@Column }
+            if (f.loading) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            } else {
             f.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             f.message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             GhCard {
@@ -134,6 +138,7 @@ fun ProfileEditScreen(onBack: () -> Unit, vm: ProfileEditViewModel = hiltViewMod
             Button(onClick = { vm.save() }, enabled = !f.saving, modifier = Modifier.fillMaxWidth()) {
                 if (f.saving) CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
                 else { Icon(Icons.Filled.Save, null); Spacer(Modifier.width(6.dp)); Text("Save changes") }
+            }
             }
             EmbeddedTerminal(section = "Profile")
         }

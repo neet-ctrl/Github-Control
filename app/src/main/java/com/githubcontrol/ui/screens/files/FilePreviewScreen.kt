@@ -111,23 +111,21 @@ fun FilePreviewScreen(
             HeaderRow(s.kind, s.mimeType, s.bytes?.size ?: 0)
             Spacer(Modifier.height(8.dp))
 
-            if (s.loading) { LoadingIndicator(); return@Scaffold }
-            s.error?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(8.dp))
-                return@Scaffold
-            }
-
-            when (s.kind) {
-                PreviewKind.Markdown -> MarkdownView(s.text ?: "", editing, content, { content = it }, commitMsg, { commitMsg = it })
-                PreviewKind.Text -> TextView(s.text ?: "", editing, content, { content = it }, commitMsg, { commitMsg = it })
-                PreviewKind.Image -> ImageView(s)
-                PreviewKind.Svg -> SvgView(s.text)
-                PreviewKind.Html -> HtmlView(s.text ?: "")
-                PreviewKind.Pdf -> PdfView(ctx, s.bytes, fileName)
-                PreviewKind.Audio -> MediaView(ctx, s.bytes, fileName, isVideo = false)
-                PreviewKind.Video -> MediaView(ctx, s.bytes, fileName, isVideo = true)
-                PreviewKind.Archive -> ArchiveView(s.bytes)
-                PreviewKind.Binary -> HexDumpView(s.bytes)
+            when {
+                s.loading -> LoadingIndicator()
+                s.error != null -> Text(s.error!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(8.dp))
+                else -> when (s.kind) {
+                    PreviewKind.Markdown -> MarkdownView(s.text ?: "", editing, content, { content = it }, commitMsg, { commitMsg = it })
+                    PreviewKind.Text -> TextView(s.text ?: "", editing, content, { content = it }, commitMsg, { commitMsg = it })
+                    PreviewKind.Image -> ImageView(s)
+                    PreviewKind.Svg -> SvgView(s.text)
+                    PreviewKind.Html -> HtmlView(s.text ?: "")
+                    PreviewKind.Pdf -> PdfView(ctx, s.bytes, fileName)
+                    PreviewKind.Audio -> MediaView(ctx, s.bytes, fileName, isVideo = false)
+                    PreviewKind.Video -> MediaView(ctx, s.bytes, fileName, isVideo = true)
+                    PreviewKind.Archive -> ArchiveView(s.bytes)
+                    PreviewKind.Binary -> HexDumpView(s.bytes)
+                }
             }
         }
     }

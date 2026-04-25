@@ -64,6 +64,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:largeHeap="true"
         android:theme="@style/Theme.GitHubControl.Splash"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="34">

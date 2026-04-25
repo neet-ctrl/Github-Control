@@ -1,0 +1,63 @@
+21:10:04.552  INFO  [CrashHandler      ] installed → /data/user/0/com.githubcontrol/files/crashes
+21:10:04.553  INFO  [WidgetCtl         ] started — observing upload state
+21:10:04.554  INFO  [App               ] GitHub Control starting v1.0.0
+21:10:06.953  NET   [HTTP              ] → GET /user
+21:10:07.586  NET   [HTTP              ] ← 200 GET /user  633ms  rl=4999
+21:10:07.600  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+21:10:07.993  NET   [HTTP              ] ← 200 GET /user/repos  393ms  rl=4998
+21:10:08.015  NET   [HTTP              ] → GET /rate_limit
+21:10:08.333  NET   [HTTP              ] ← 200 GET /rate_limit  318ms  rl=5000
+21:10:08.351  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+21:10:08.700  NET   [HTTP              ] ← 200 GET /notifications  349ms  rl=4997
+21:10:21.748  NET   [HTTP              ] → GET /user/keys
+21:10:22.058  NET   [HTTP              ] ← 200 GET /user/keys  310ms  rl=4999
+21:10:29.052  NET   [HTTP              ] → POST /user/keys
+21:10:29.403  NET   [HTTP              ] ← 201 POST /user/keys  352ms  rl=4998
+21:10:29.409  INFO  [SshKeys           ] added key 'tet'
+21:10:29.415  NET   [HTTP              ] → GET /user/keys
+21:10:29.794  NET   [HTTP              ] ← 200 GET /user/keys  379ms  rl=4997
+21:30:45.854  NET   [HTTP              ] → GET /user
+21:30:46.448  NET   [HTTP              ] ← 200 GET /user  593ms  rl=4996
+21:30:46.462  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+21:30:46.912  NET   [HTTP              ] ← 200 GET /user/repos  449ms  rl=4995
+21:30:46.926  NET   [HTTP              ] → GET /rate_limit
+21:30:47.225  NET   [HTTP              ] ← 200 GET /rate_limit  299ms  rl=4997
+21:30:47.234  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+21:30:47.641  NET   [HTTP              ] ← 200 GET /notifications  407ms  rl=4994
+21:30:55.965  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox
+21:30:56.430  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/Smart-Toolbox  465ms  rl=4996
+21:30:56.449  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/Smart-Toolbox
+21:30:56.744  NET   [HTTP              ] ← 404 GET /user/starred/kumaritkahs-max/Smart-Toolbox  295ms  rl=4995
+21:30:56.757  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox/branches?per_page=100
+21:30:56.848  NET   [HTTP              ] → GET /user
+21:30:57.229  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/Smart-Toolbox/branches  472ms  rl=4993
+21:30:57.232  NET   [HTTP              ] ← 200 GET /user  384ms  rl=4992
+21:30:57.239  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+21:30:57.252  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox/contributors?per_page=30
+21:30:57.622  NET   [HTTP              ] ← 200 GET /user/repos  383ms  rl=4991
+21:30:57.628  NET   [HTTP              ] → GET /rate_limit
+21:30:57.711  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/Smart-Toolbox/contributors  459ms  rl=4990
+21:30:57.742  NET   [HTTP              ] → GET /repos/kumaritkahs-max/Smart-Toolbox/languages
+21:30:57.839  ERROR [HTTP              ] ✕ GET /repos/kumaritkahs-max/Smart-Toolbox/languages :: IOException: Canceled
+21:30:57.934  NET   [HTTP              ] ← 200 GET /rate_limit  306ms  rl=4995
+21:30:57.950  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+21:30:58.356  NET   [HTTP              ] ← 200 GET /notifications  406ms  rl=4988
+21:30:59.983  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing
+21:31:00.379  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing  395ms  rl=4994
+21:31:00.396  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testing
+21:31:00.705  NET   [HTTP              ] ← 204 GET /user/starred/kumaritkahs-max/testing  309ms  rl=4993
+21:31:00.725  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches?per_page=100
+21:31:01.180  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/branches  455ms  rl=4987
+21:31:01.198  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/contributors?per_page=30
+21:31:01.626  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/contributors  427ms  rl=4986
+21:31:01.638  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/languages
+21:31:02.027  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/languages  389ms  rl=4985
+21:31:04.394  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/branches?per_page=100
+21:31:04.783  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testing/branches  389ms  rl=4984
+21:31:04.809  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/contents/.gitignore?ref=main
+21:31:05.111  NET   [HTTP              ] ← 404 GET /repos/kumaritkahs-max/testing/contents/.gitignore  302ms  rl=4992
+21:31:14.254  INFO  [Upload            ] start kumaritkahs-max/testing@main files=1 bytes=61147932
+21:31:14.677  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testing/contents/Smart%20Toolbox.apk?ref=main
+21:31:14.992  NET   [HTTP              ] ← 404 GET /repos/kumaritkahs-max/testing/contents/Smart%20Toolbox.apk  315ms  rl=4991
+21:31:15.244  ERROR [Upload            ] FAIL Smart Toolbox.apk :: OutOfMemoryError: Failed to allocate a 163061168 byte allocation with 50331648 free bytes and 114MB until OOM, target footprint 199064992, growth limit 268435456
+21:31:15.307  INFO  [Upload            ] done ok=false done=1 failed=1 skipped=0

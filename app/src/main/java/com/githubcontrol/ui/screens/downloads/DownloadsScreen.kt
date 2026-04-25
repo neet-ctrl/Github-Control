@@ -26,12 +26,15 @@ fun DownloadsScreen(onBack: () -> Unit, vm: DownloadsViewModel = hiltViewModel()
     Scaffold(topBar = {
         TopAppBar(title = { Text("Downloads") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } })
     }) { pad ->
-        if (items.isEmpty()) { Text("No downloads yet.", modifier = Modifier.padding(pad).padding(24.dp)); return@Scaffold }
-        LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(items, key = { it.id }) { d ->
-                GhCard {
-                    Text(d.path.substringAfterLast('/').ifEmpty { d.path }, style = MaterialTheme.typography.titleSmall)
-                    Text("${d.owner}/${d.repo} • ${ByteFormat.human(d.sizeBytes)} • ${d.localPath}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (items.isEmpty()) {
+            Text("No downloads yet.", modifier = Modifier.padding(pad).padding(24.dp))
+        } else {
+            LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(items, key = { it.id }) { d ->
+                    GhCard {
+                        Text(d.path.substringAfterLast('/').ifEmpty { d.path }, style = MaterialTheme.typography.titleSmall)
+                        Text("${d.owner}/${d.repo} • ${ByteFormat.human(d.sizeBytes)} • ${d.localPath}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }

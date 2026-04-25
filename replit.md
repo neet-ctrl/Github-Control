@@ -80,6 +80,30 @@ These are linked from `SettingsScreen.Tools/Account` and from the `RepoDetailScr
 "Administration" card. The TreeScreen now supports multi-select, bulk delete,
 and ZIP-folder download via the Storage Access Framework.
 
+## Recent bug-fix iteration
+- **Compose imbalance crashes** — removed every `return@Scaffold` / `return@Column`
+  inside a Compose lambda across IssuesScreen, NotificationsScreen, PullDetailScreen,
+  PullsScreen, RepoDetailScreen, RepoListScreen, DownloadsScreen, DashboardScreen
+  (early-return now uses `if/else` so the slot-table balance is preserved).
+- **Last-route restore** — `AccountManager` persists `lastRoute` to DataStore;
+  `AppRoot` collects via `currentBackStackEntryFlow` and warps to the last screen
+  on cold start.
+- **Add-account no-biometric loop** — `MainViewModel.addingAccount` flag (set by
+  `AccountsScreen.onAdd`, cleared by `LoginScreen.onDone`) routes to LOGIN while
+  set so the biometric prompt does not fire mid add-account flow.
+- **Branch rename / delete UX** — `BranchesViewModel` now exposes friendly text
+  ("Renaming…", "Couldn't rename: target name may already exist…") instead of
+  raw HTTP errors; per-action `renaming` / `deleting` state is exposed for spinners.
+- **REPLACE_FOLDER upload mode** — `UploadManager.runReplaceFolder` lists existing
+  blobs (`gitTree(recursive=1)`), then issues a single atomic `commitFiles` with
+  deletes + adds. UI exposes the new mode in the conflict-mode chip row.
+- **Large-file upload OOM** — `streamBase64` pipes the URI through a
+  `Base64OutputStream` so raw bytes and encoded string are never resident at the
+  same time. AndroidManifest enables `largeHeap`.
+- **Sync screen** — full setup flow: Info card explainer, "Add sync job" FAB
+  launches `OpenDocumentTree` + persists URI permission, dialog captures
+  owner/repo/branch/remotePath/interval, toggle + delete wired to the DAO.
+
 ## Building the APK
 The Replit container can NOT compile Android. Use the GitHub Actions workflow
 (`.github/workflows/android.yml`) which runs `gradlew assembleDebug` on Ubuntu

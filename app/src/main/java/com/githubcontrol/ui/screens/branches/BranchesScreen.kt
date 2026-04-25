@@ -33,20 +33,25 @@ fun BranchesScreen(owner: String, name: String, onBack: () -> Unit, vm: Branches
         },
         floatingActionButton = { FloatingActionButton(onClick = { createDialog = true }) { Icon(Icons.Filled.Add, null) } }
     ) { pad ->
-        if (s.loading) { LoadingIndicator(); return@Scaffold }
-        s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(8.dp)) }
-        s.message?.let { Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(8.dp)) }
-        LazyColumn(Modifier.padding(pad), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(s.items, key = { it.name }) { b ->
-                GhCard {
-                    Row {
-                        Column(Modifier.weight(1f)) {
-                            Text(b.name, style = MaterialTheme.typography.titleSmall)
-                            Text(b.commit.sha.take(7), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.padding(pad).fillMaxSize()) {
+            if (s.loading) {
+                LoadingIndicator()
+            } else {
+                s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(8.dp)) }
+                s.message?.let { Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(8.dp)) }
+                LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(s.items, key = { it.name }) { b ->
+                        GhCard {
+                            Row {
+                                Column(Modifier.weight(1f)) {
+                                    Text(b.name, style = MaterialTheme.typography.titleSmall)
+                                    Text(b.commit.sha.take(7), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                if (b.protected) GhBadge("protected", MaterialTheme.colorScheme.tertiary)
+                                IconButton(onClick = { renameDialog = b.name }) { Icon(Icons.Filled.Edit, null) }
+                                IconButton(onClick = { deleteDialog = b.name }) { Icon(Icons.Filled.Delete, null) }
+                            }
                         }
-                        if (b.protected) GhBadge("protected", MaterialTheme.colorScheme.tertiary)
-                        IconButton(onClick = { renameDialog = b.name }) { Icon(Icons.Filled.Edit, null) }
-                        IconButton(onClick = { deleteDialog = b.name }) { Icon(Icons.Filled.Delete, null) }
                     }
                 }
             }

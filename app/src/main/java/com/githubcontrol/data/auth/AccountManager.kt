@@ -53,6 +53,7 @@ class AccountManager @Inject constructor(
     private val keyCorner = intPreferencesKey("corner_radius")             // 0..28
     private val keyTerminalTheme = stringPreferencesKey("terminal_theme")  // github/dracula/solarized/mono
     private val keyOnboardingDone = booleanPreferencesKey("onboarding_completed")
+    private val keyLastRoute = stringPreferencesKey("last_route")
 
     val rateRemaining = MutableStateFlow<Int?>(null)
     fun updateRateRemaining(v: Int) { rateRemaining.value = v }
@@ -80,6 +81,10 @@ class AccountManager @Inject constructor(
     val onboardingCompletedFlow: Flow<Boolean> = context.dataStore.data.map { it[keyOnboardingDone] ?: false }
     suspend fun setOnboardingCompleted(done: Boolean) =
         context.dataStore.edit { it[keyOnboardingDone] = done }
+
+    val lastRouteFlow: Flow<String?> = context.dataStore.data.map { it[keyLastRoute] }
+    suspend fun setLastRoute(route: String) = context.dataStore.edit { it[keyLastRoute] = route }
+    suspend fun lastRoute(): String? = context.dataStore.data.first()[keyLastRoute]
 
     private fun loadAccounts(): List<Account> {
         val raw = secure.getString(keyAccounts, null) ?: return emptyList()

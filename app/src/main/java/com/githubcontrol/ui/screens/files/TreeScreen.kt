@@ -80,12 +80,14 @@ fun TreeScreen(owner: String, name: String, ref: String, onBack: () -> Unit, onP
         )
     }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
-            if (s.loading) { LoadingIndicator(); return@Scaffold }
-            s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
-            if (s.truncated) Text("Tree truncated by GitHub (very large repo)", color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(8.dp))
-            if (downloading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            val visible = s.items.filter { it.visible }
-            LazyColumn(Modifier.weight(1f)) {
+            if (s.loading) {
+                LoadingIndicator()
+            } else {
+                s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
+                if (s.truncated) Text("Tree truncated by GitHub (very large repo)", color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(8.dp))
+                if (downloading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                val visible = s.items.filter { it.visible }
+                LazyColumn(Modifier.weight(1f)) {
                 items(visible, key = { it.path }) { node ->
                     Row(
                         Modifier
@@ -115,6 +117,7 @@ fun TreeScreen(owner: String, name: String, ref: String, onBack: () -> Unit, onP
                             Text(com.githubcontrol.utils.ByteFormat.human(node.size), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Divider()
+                }
                 }
             }
             EmbeddedTerminal(section = "Tree")

@@ -57,22 +57,25 @@ fun FilesScreen(
             }
         }
     ) { pad ->
-        if (s.loading) { LoadingIndicator(); return@Scaffold }
-        s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
-        LazyColumn(Modifier.padding(pad), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (path.isNotBlank()) {
-                item {
-                    GhCard(onClick = {
-                        val parent = path.substringBeforeLast('/', "")
-                        onNavigate(Routes.files(owner, name, parent, s.ref))
-                    }) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.ArrowUpward, null); Spacer(Modifier.width(8.dp)); Text("..")
+        Column(Modifier.padding(pad).fillMaxSize()) {
+            if (s.loading) {
+                LoadingIndicator()
+            } else {
+                s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
+                LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (path.isNotBlank()) {
+                        item {
+                            GhCard(onClick = {
+                                val parent = path.substringBeforeLast('/', "")
+                                onNavigate(Routes.files(owner, name, parent, s.ref))
+                            }) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Filled.ArrowUpward, null); Spacer(Modifier.width(8.dp)); Text("..")
+                                }
+                            }
                         }
                     }
-                }
-            }
-            items(s.items, key = { it.path }) { item ->
+                    items(s.items, key = { it.path }) { item ->
                 val selected = s.selection.contains(item.path)
                 SwipeRow(
                     onDelete = { if (item.type == "file") showDelete = item },
@@ -94,6 +97,8 @@ fun FilesScreen(
                                 if (item.type == "file") Text(ByteFormat.human(item.size), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
+                    }
+                }
                     }
                 }
             }

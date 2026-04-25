@@ -63,7 +63,9 @@ fun DashboardScreen(
             ExtendedFloatingActionButton(onClick = { onNavigate(Routes.CREATE_REPO) }, icon = { Icon(Icons.Filled.Add, null) }, text = { Text("New repo") })
         }
     ) { pad ->
-        if (s.loading && s.user == null) { LoadingIndicator("Loading dashboard"); return@Scaffold }
+        if (s.loading && s.user == null) {
+            Box(Modifier.padding(pad).fillMaxSize()) { LoadingIndicator("Loading dashboard") }
+        } else {
         LazyColumn(Modifier.padding(pad).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 GhCard {
@@ -116,6 +118,7 @@ fun DashboardScreen(
                 }
             }
             item { Spacer(Modifier.height(80.dp)) }
+        }
         }
     }
 }

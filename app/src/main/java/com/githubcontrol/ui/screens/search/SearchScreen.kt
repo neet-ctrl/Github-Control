@@ -45,10 +45,12 @@ fun SearchScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: SearchVie
                 SearchKind.values().forEach { k -> Tab(selected = k == s.kind, onClick = { vm.setKind(k) }, text = { Text(k.name) }) }
             }
             Spacer(Modifier.height(8.dp))
-            if (s.loading) { LoadingIndicator(); return@Scaffold }
-            s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            if (s.total > 0) Text("${s.total} matches", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (s.loading) {
+                LoadingIndicator()
+            } else {
+                s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                if (s.total > 0) Text("${s.total} matches", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 when (s.kind) {
                     SearchKind.REPOS -> items(s.repos) { r ->
                         GhCard(onClick = { onNavigate(Routes.repoDetail(r.owner.login, r.name)) }) {
@@ -68,6 +70,7 @@ fun SearchScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: SearchVie
                             Text(u.name ?: "", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                }
                 }
             }
         }

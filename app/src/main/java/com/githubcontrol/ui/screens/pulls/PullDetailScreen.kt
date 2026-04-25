@@ -26,8 +26,11 @@ fun PullDetailScreen(owner: String, name: String, number: Int, onBack: () -> Uni
         TopAppBar(title = { Text("PR #$number") },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } })
     }) { pad ->
-        if (s.loading) { LoadingIndicator(); return@Scaffold }
-        val pr = s.pull ?: return@Scaffold
+        val pr = s.pull
+        when {
+            s.loading -> Box(Modifier.padding(pad).fillMaxSize()) { LoadingIndicator() }
+            pr == null -> Box(Modifier.padding(pad).fillMaxSize()) { Text("Loading…", modifier = Modifier.padding(16.dp)) }
+            else ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             GhCard {
                 Text(pr.title, style = MaterialTheme.typography.titleLarge)
@@ -60,6 +63,7 @@ fun PullDetailScreen(owner: String, name: String, number: Int, onBack: () -> Uni
             }
             s.message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        }
         }
     }
 }

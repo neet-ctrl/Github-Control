@@ -34,7 +34,9 @@ fun PullsScreen(owner: String, name: String, onBack: () -> Unit, onOpen: (Int) -
             TabRow(selectedTabIndex = listOf("open", "closed", "all").indexOf(tab)) {
                 listOf("open", "closed", "all").forEach { Tab(selected = tab == it, onClick = { tab = it }, text = { Text(it.replaceFirstChar { c -> c.uppercase() }) }) }
             }
-            if (s.loading) { LoadingIndicator(); return@Scaffold }
+            if (s.loading) {
+                LoadingIndicator()
+            } else {
             LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(s.list, key = { it.id }) { pr ->
                     GhCard(onClick = { onOpen(pr.number) }) {
@@ -47,6 +49,7 @@ fun PullsScreen(owner: String, name: String, onBack: () -> Unit, onOpen: (Int) -
                         }
                     }
                 }
+            }
             }
         }
     }

@@ -121,7 +121,8 @@ fun UploadScreen(owner: String, name: String, path: String, ref: String, onBack:
                     Text(
                         "OVERWRITE — replace the existing file. " +
                             "SKIP — keep the version that's already in the repo, do not commit. " +
-                            "RENAME — append a numeric suffix so both files coexist.",
+                            "RENAME — append a numeric suffix so both files coexist. " +
+                            "REPLACE_FOLDER — make the target folder match exactly what you upload (deletes any extra files in that folder, in a single atomic commit).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
