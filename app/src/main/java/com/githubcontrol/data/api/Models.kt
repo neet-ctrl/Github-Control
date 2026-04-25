@@ -625,3 +625,83 @@ data class GhCollaboratorPermissions(
 
 @Serializable
 data class AddCollaboratorRequest(val permission: String = "push")
+
+// ---------- Codespaces ----------
+
+@Serializable
+data class GhCodespace(
+    val id: Long,
+    val name: String,
+    @SerialName("display_name") val displayName: String? = null,
+    @SerialName("environment_id") val environmentId: String? = null,
+    val owner: GhUser? = null,
+    val repository: GhRepo? = null,
+    val machine: GhCodespaceMachine? = null,
+    @SerialName("devcontainer_path") val devcontainerPath: String? = null,
+    val prebuild: Boolean? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("last_used_at") val lastUsedAt: String? = null,
+    val state: String = "Unknown",
+    val url: String? = null,
+    @SerialName("git_status") val gitStatus: GhCodespaceGitStatus? = null,
+    val location: String? = null,
+    @SerialName("idle_timeout_minutes") val idleTimeoutMinutes: Int? = null,
+    @SerialName("web_url") val webUrl: String? = null,
+    @SerialName("machines_url") val machinesUrl: String? = null,
+    @SerialName("start_url") val startUrl: String? = null,
+    @SerialName("stop_url") val stopUrl: String? = null,
+    @SerialName("pulls_url") val pullsUrl: String? = null,
+    @SerialName("recent_folders") val recentFolders: List<String> = emptyList()
+)
+
+@Serializable
+data class GhCodespaceMachine(
+    val name: String,
+    @SerialName("display_name") val displayName: String? = null,
+    @SerialName("operating_system") val operatingSystem: String? = null,
+    @SerialName("storage_in_bytes") val storageInBytes: Long? = null,
+    @SerialName("memory_in_bytes") val memoryInBytes: Long? = null,
+    @SerialName("cpus") val cpus: Int? = null,
+    @SerialName("prebuild_availability") val prebuildAvailability: String? = null
+)
+
+@Serializable
+data class GhCodespaceGitStatus(
+    val ahead: Int = 0,
+    val behind: Int = 0,
+    @SerialName("has_unpushed_changes") val hasUnpushedChanges: Boolean = false,
+    @SerialName("has_uncommitted_changes") val hasUncommittedChanges: Boolean = false,
+    val ref: String? = null
+)
+
+@Serializable
+data class GhCodespacesPage(
+    @SerialName("total_count") val totalCount: Int = 0,
+    val codespaces: List<GhCodespace> = emptyList()
+)
+
+@Serializable
+data class GhCodespaceMachinesPage(
+    @SerialName("total_count") val totalCount: Int = 0,
+    val machines: List<GhCodespaceMachine> = emptyList()
+)
+
+/**
+ * Body for `POST /repos/{owner}/{repo}/codespaces`. The `ref` field is normally
+ * a branch name but the API also accepts a commit SHA — we send the SHA so a
+ * codespace can be opened pinned to one specific commit.
+ */
+@Serializable
+data class CreateCodespaceRequest(
+    val ref: String? = null,
+    val location: String? = null,
+    @SerialName("client_ip") val clientIp: String? = null,
+    val machine: String? = null,
+    @SerialName("devcontainer_path") val devcontainerPath: String? = null,
+    @SerialName("multi_repo_permissions_opt_out") val multiRepoPermissionsOptOut: Boolean? = null,
+    @SerialName("working_directory") val workingDirectory: String? = null,
+    @SerialName("idle_timeout_minutes") val idleTimeoutMinutes: Int? = null,
+    @SerialName("display_name") val displayName: String? = null,
+    @SerialName("retention_period_minutes") val retentionPeriodMinutes: Int? = null
+)

@@ -2,7 +2,10 @@ package com.githubcontrol.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.githubcontrol.data.api.CreateCodespaceRequest
 import com.githubcontrol.data.api.GhBranch
+import com.githubcontrol.data.api.GhCodespace
+import com.githubcontrol.data.api.GhCodespaceMachine
 import com.githubcontrol.data.api.GhCommit
 import com.githubcontrol.data.api.GhCommitCompare
 import com.githubcontrol.data.repository.GitHubRepository
@@ -32,7 +35,16 @@ data class CommitDetailState(
     val actionMessage: String? = null,
     val ignoreWhitespace: Boolean = false,
     val sideBySide: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    /** Codespaces present in this repo for the active account. */
+    val codespaces: List<GhCodespace> = emptyList(),
+    val codespacesLoading: Boolean = false,
+    val codespacesError: String? = null,
+    /** Machine types available for a codespace at this commit. */
+    val codespaceMachines: List<GhCodespaceMachine> = emptyList(),
+    /** Codespace name currently mid-action (start/stop/delete) — used to disable the row UI. */
+    val busyCodespaceName: String? = null,
+    val creatingCodespace: Boolean = false
 )
 
 data class CompareState(
@@ -118,6 +130,117 @@ class CommitsViewModel @Inject constructor(private val repo: GitHubRepository) :
                 val brs = runCatching { repo.branches(owner, name) }.getOrNull().orEmpty()
                 _detail.value = _detail.value.copy(defaultBranch = def, branches = brs)
             } catch (_: Throwable) { /* non-fatal */ }
+        }
+        loadCodespaces(owner, name)
+        loadCodespaceMachines(owner, name, sha)
+    }
+
+    /** Refresh the list of codespaces this account has in [owner]/[name]. */
+    fun loadCodespaces(owner: String, name: String) {
+        viewModelScope.launch {
+            _detail.value = _detail.value.copy(codespacesLoading = true, codespacesError = null)
+            try {
+                val page = repo.listRepoCodespaces(owner, name)
+                _detail.value = _detail.value.copy(
+                    codespacesLoading = false,
+                    codespaces = page.codespaces
+                )
+            } catch (t: Throwable) {
+                _detail.value = _detail.value.copy(
+                    codespacesLoading = false,
+                    codespacesError = t.message ?: "Couldn't list codespaces"
+                )
+            }
+        }
+    }
+
+    /** Pre-fetch machine types so the create dialog can offer the right options for this commit. */
+    fun loadCodespaceMachines(owner: String, name: String, sha: String) {
+        viewModelScope.launch {
+            val machines = repo.listRepoCodespaceMachines(owner, name, ref = sha)
+            _detail.value = _detail.value.copy(codespaceMachines = machines)
+        }
+    }
+
+    /**
+     * Create a new Codespace pinned to this commit. The Codespaces API normally
+     * accepts a branch in `ref` but a commit SHA also works in practice.
+     */
+    fun createCodespaceForCommit(
+        owner: String,
+        name: String,
+        sha: String,
+        machine: String? = null,
+        devcontainerPath: String? = null,
+        displayName: String? = null,
+        idleTimeoutMinutes: Int? = null
+    ) {
+        viewModelScope.launch {
+            _detail.value = _detail.value.copy(creatingCodespace = true, actionMessage = null)
+            try {
+                val cs = repo.createCodespace(
+                    owner, name,
+                    CreateCodespaceRequest(
+                        ref = sha,
+                        machine = machine,
+                        devcontainerPath = devcontainerPath,
+                        displayName = displayName,
+                        idleTimeoutMinutes = idleTimeoutMinutes
+                    )
+                )
+                _detail.value = _detail.value.copy(
+                    creatingCodespace = false,
+                    codespaces = (listOf(cs) + _detail.value.codespaces).distinctBy { it.name },
+                    actionMessage = "Codespace '${cs.displayName ?: cs.name}' created — state: ${cs.state}"
+                )
+            } catch (t: Throwable) {
+                _detail.value = _detail.value.copy(
+                    creatingCodespace = false,
+                    actionMessage = "Couldn't create codespace: ${t.message}"
+                )
+            }
+        }
+    }
+
+    fun startCodespace(name: String) = runCodespaceAction(name, "Starting") { repo.startCodespace(name) }
+    fun stopCodespace(name: String)  = runCodespaceAction(name, "Stopping") { repo.stopCodespace(name) }
+    fun refreshCodespace(name: String) = runCodespaceAction(name, "Refreshing") { repo.codespace(name) }
+
+    fun deleteCodespace(name: String) {
+        viewModelScope.launch {
+            _detail.value = _detail.value.copy(busyCodespaceName = name, actionMessage = null)
+            try {
+                repo.deleteCodespace(name)
+                _detail.value = _detail.value.copy(
+                    busyCodespaceName = null,
+                    codespaces = _detail.value.codespaces.filterNot { it.name == name },
+                    actionMessage = "Deleted codespace '$name'"
+                )
+            } catch (t: Throwable) {
+                _detail.value = _detail.value.copy(
+                    busyCodespaceName = null,
+                    actionMessage = "Delete failed: ${t.message}"
+                )
+            }
+        }
+    }
+
+    private fun runCodespaceAction(name: String, verb: String, block: suspend () -> GhCodespace) {
+        viewModelScope.launch {
+            _detail.value = _detail.value.copy(busyCodespaceName = name, actionMessage = "$verb '$name'…")
+            try {
+                val updated = block()
+                _detail.value = _detail.value.copy(
+                    busyCodespaceName = null,
+                    codespaces = _detail.value.codespaces.map { if (it.name == name) updated else it },
+                    actionMessage = "$verb done — state: ${updated.state}"
+                )
+            } catch (t: Throwable) {
+                _detail.value = _detail.value.copy(
+                    busyCodespaceName = null,
+                    actionMessage = "$verb failed: ${t.message}"
+                )
+            }
         }
     }
 

@@ -330,6 +330,23 @@ android-app/
 
 ## Recent fixes & improvements
 
+- **Codespaces from a commit (CommitDetailScreen).** Each commit now has a
+  Codespaces card that lists every codespace this account has in the repo
+  with state, machine, ref and ahead/behind counters. The "Create at this
+  commit" button opens a dialog (machine type dropdown populated from
+  `repos/{owner}/{repo}/codespaces/machines?ref=<sha>`, optional display
+  name, devcontainer path and idle timeout) and posts to
+  `repos/{owner}/{repo}/codespaces` with `ref` set to the SHA so the env
+  is pinned to that exact commit. Each row has open-in-browser, copy URL,
+  start, stop and delete (with confirm); tapping a row opens a details
+  dialog with full metadata (state, machine specs, git status, web URL)
+  plus a "Copy details" action. A secondary button opens
+  `https://github.com/codespaces/new/<owner>/<repo>/tree/<sha>` in the
+  browser as a fallback. New code lives in
+  `data/api/{Models.kt,GitHubApi.kt}`,
+  `data/repository/GitHubRepository.kt`,
+  `viewmodel/CommitsViewModel.kt` and
+  `ui/screens/commits/CommitDetailScreen.kt`.
 - **Atomic folder delete (FilesScreen).** Swipe-to-delete on a directory in
   the file tree now opens a commit-message dialog and deletes the entire
   subtree in a single Git Data API commit (blob → tree → commit → ref-update),

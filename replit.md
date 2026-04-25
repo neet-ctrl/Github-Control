@@ -129,6 +129,20 @@ and ZIP-folder download via the Storage Access Framework.
 
 ## Latest iteration (Apr 2026)
 
+- **Codespaces from a commit** — `CommitDetailScreen` now embeds a
+  Codespaces card (state badge, machine + git status, ahead/behind) with
+  per-row actions: open in browser, copy URL, start, stop, and delete
+  (with confirm). Tapping a row opens a details dialog with the full
+  metadata payload and a "Copy details" action. The "Create at this
+  commit" button opens a dialog whose machine-type dropdown is populated
+  by `repos/{owner}/{repo}/codespaces/machines?ref=<sha>`; on confirm it
+  calls `createCodespace` with `ref=<sha>` so the env is pinned to that
+  commit. A secondary button opens
+  `https://github.com/codespaces/new/<owner>/<repo>/tree/<sha>` in the
+  browser as a fallback. New plumbing: 7 endpoints in `GitHubApi.kt`,
+  6 facade methods in `GitHubRepository.kt`, codespace state +
+  `loadCodespaces / loadCodespaceMachines / createCodespaceForCommit /
+  start|stop|refresh|deleteCodespace` in `CommitsViewModel.kt`.
 - **Account switcher actually switches** — `MainViewModel.switchAccount`
   now emits a `accountSwitched: SharedFlow<String>` after calling
   `accountManager.setActiveAccount(...)` and refreshing dashboard data.

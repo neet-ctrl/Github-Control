@@ -228,4 +228,25 @@ class GitHubRepository @Inject constructor(
         api.updateRef(owner, name, "heads/$branch", UpdateRefRequest(commit.sha, false))
         commit
     }
+
+    // ---------- Codespaces ----------
+
+    suspend fun listRepoCodespaces(owner: String, name: String, page: Int = 1, perPage: Int = 30): GhCodespacesPage =
+        withContext(Dispatchers.IO) { api.repoCodespaces(owner, name, perPage, page) }
+
+    suspend fun listRepoCodespaceMachines(owner: String, name: String, ref: String? = null): List<GhCodespaceMachine> =
+        withContext(Dispatchers.IO) {
+            runCatching { api.repoCodespaceMachines(owner, name, ref = ref).machines }.getOrDefault(emptyList())
+        }
+
+    suspend fun createCodespace(owner: String, name: String, body: CreateCodespaceRequest): GhCodespace =
+        withContext(Dispatchers.IO) { api.createCodespace(owner, name, body) }
+
+    suspend fun codespace(name: String): GhCodespace = withContext(Dispatchers.IO) { api.codespace(name) }
+    suspend fun startCodespace(name: String): GhCodespace = withContext(Dispatchers.IO) { api.startCodespace(name) }
+    suspend fun stopCodespace(name: String): GhCodespace = withContext(Dispatchers.IO) { api.stopCodespace(name) }
+    suspend fun deleteCodespace(name: String) = withContext(Dispatchers.IO) {
+        val r = api.deleteCodespace(name)
+        if (!r.isSuccessful) throw IllegalStateException("Delete codespace failed: HTTP ${r.code()}")
+    }
 }

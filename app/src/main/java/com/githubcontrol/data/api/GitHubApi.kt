@@ -359,6 +359,45 @@ interface GitHubApi {
         @Path("ref", encoded = true) ref: String
     ): Response<okhttp3.ResponseBody>
 
+    // ---------- Codespaces ----------
+
+    /** List codespaces the authenticated user has in [owner]/[repo]. */
+    @GET("repos/{owner}/{repo}/codespaces")
+    suspend fun repoCodespaces(
+        @Path("owner") owner: String, @Path("repo") repo: String,
+        @Query("per_page") perPage: Int = 30,
+        @Query("page") page: Int = 1
+    ): GhCodespacesPage
+
+    /** List the machine types available for a codespace in this repo (optionally pinned to a ref). */
+    @GET("repos/{owner}/{repo}/codespaces/machines")
+    suspend fun repoCodespaceMachines(
+        @Path("owner") owner: String, @Path("repo") repo: String,
+        @Query("location") location: String? = null,
+        @Query("client_ip") clientIp: String? = null,
+        @Query("ref") ref: String? = null
+    ): GhCodespaceMachinesPage
+
+    /** Create a codespace in the repository — accepts a branch name or commit SHA in `ref`. */
+    @POST("repos/{owner}/{repo}/codespaces")
+    suspend fun createCodespace(
+        @Path("owner") owner: String, @Path("repo") repo: String,
+        @Body body: CreateCodespaceRequest
+    ): GhCodespace
+
+    /** Single codespace by name (the `name` field on [GhCodespace], not the display name). */
+    @GET("user/codespaces/{name}")
+    suspend fun codespace(@Path("name") name: String): GhCodespace
+
+    @POST("user/codespaces/{name}/start")
+    suspend fun startCodespace(@Path("name") name: String): GhCodespace
+
+    @POST("user/codespaces/{name}/stop")
+    suspend fun stopCodespace(@Path("name") name: String): GhCodespace
+
+    @DELETE("user/codespaces/{name}")
+    suspend fun deleteCodespace(@Path("name") name: String): Response<Unit>
+
     // ---------- Raw download (for blob bytes) ----------
 
     @GET
