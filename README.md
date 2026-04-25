@@ -252,7 +252,7 @@ Where these surface in the UI:
   - lines **147–148** — repo + issues links
   - line **194** — footer *Report a bug* button
 
-After editing `BuildInfo.kt` no other files need to change — rebuild
+After editing **BuildInfo.kt** no other files need to change — rebuild
 and the About screen, update checker, and settings backup all pick up
 the new values automatically.
 
