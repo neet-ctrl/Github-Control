@@ -24,7 +24,7 @@ import com.githubcontrol.utils.ShareUtils
 import com.githubcontrol.viewmodel.MainViewModel
 import com.githubcontrol.viewmodel.RepoActionsViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun RepoDetailScreen(
     owner: String, name: String, main: MainViewModel,
