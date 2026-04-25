@@ -7,4 +7,5 @@
     <color name="warn">#D29922</color>
     <color name="danger">#F85149</color>
     <color name="white">#FFFFFF</color>
+    <color name="ic_launcher_background">#0D1117</color>
 </resources>

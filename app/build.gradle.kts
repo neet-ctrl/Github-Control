@@ -20,10 +20,25 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
+    // Release signing — keystore credentials are intentionally hardcoded so
+    // that the GitHub Actions release workflow can produce a signed APK
+    // without any repository secrets. The .jks itself is base64-encoded at
+    // app/keystore/my-release-key.jks.base64 and decoded into place by CI
+    // (see .github/workflows/build-release-apk.yml).
+    signingConfigs {
+        create("release") {
+            storeFile = file("keystore/my-release-key.jks")
+            storePassword = "Sh@090609"
+            keyAlias = "my-key"
+            keyPassword = "Sh@090609"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

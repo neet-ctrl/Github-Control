@@ -15,3 +15,6 @@ captures/
 # Keystores
 *.jks
 *.keystore
+
+# Release keystore (decoded from app/keystore/my-release-key.jks.base64 by CI)
+app/keystore/my-release-key.jks
