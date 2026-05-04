@@ -68,6 +68,7 @@ fun AppRoot() {
     val terminal by am.terminalThemeFlow.collectAsState(initial = "github-dark")
     val onboardingDone by am.onboardingCompletedFlow.collectAsState(initial = true)
     val lastRoute by am.lastRouteFlow.collectAsState(initial = null)
+    val biometricEnabled by am.biometricEnabledFlow.collectAsState(initial = false)
 
     val settings = ThemeSettings(
         mode = theme, accentKey = accent, dynamicColor = dynamic, amoled = amoled,
@@ -78,14 +79,14 @@ fun AppRoot() {
     GitHubControlTheme(settings = settings) {
         val nav = rememberNavController()
 
-        LaunchedEffect(state.loggedIn, state.locked, onboardingDone) {
+        LaunchedEffect(state.loggedIn, state.locked, onboardingDone, biometricEnabled) {
             // The "add another account" flow intentionally skips this auto-routing —
             // it lives entirely in the existing back stack so that the back button
             // returns the user to AccountsScreen / Dashboard after sign-in completes.
             val target = when {
                 !onboardingDone -> Routes.ONBOARDING
                 !state.loggedIn -> Routes.LOGIN
-                state.locked -> Routes.BIOMETRIC
+                state.locked && biometricEnabled -> Routes.BIOMETRIC
                 else -> lastRoute ?: Routes.DASHBOARD
             }
             val current = nav.currentDestination?.route

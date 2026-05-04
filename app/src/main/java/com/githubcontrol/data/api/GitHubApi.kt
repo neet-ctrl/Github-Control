@@ -147,6 +147,9 @@ interface GitHubApi {
     @DELETE("repos/{owner}/{repo}/git/refs/{ref}")
     suspend fun deleteRef(@Path("owner") owner: String, @Path("repo") repo: String, @Path("ref", encoded = true) ref: String): Response<Unit>
 
+    @GET("repos/{owner}/{repo}/git/blobs/{sha}")
+    suspend fun getBlob(@Path("owner") owner: String, @Path("repo") repo: String, @Path("sha") sha: String): GhBlob
+
     @POST("repos/{owner}/{repo}/git/blobs")
     suspend fun createBlob(@Path("owner") owner: String, @Path("repo") repo: String, @Body body: CreateBlobRequest): GhBlob
 
