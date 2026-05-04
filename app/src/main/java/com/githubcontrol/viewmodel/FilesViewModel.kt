@@ -110,15 +110,33 @@ class FilesViewModel @Inject constructor(private val repo: GitHubRepository) : V
         val s = _state.value
         val selectedItems = s.items.filter { s.selection.contains(it.path) }
         if (selectedItems.isEmpty()) { onDone(); return }
+        val branch = s.ref.ifBlank { null }
         viewModelScope.launch {
             try {
-                val branch = s.ref.ifBlank { "HEAD" }
-                val paths = expandPaths(s.owner, s.name, s.ref, selectedItems)
-                android.util.Log.d("FilesVM", "deleteSelected ${paths.size} paths on branch $branch")
-                val ops: List<Pair<String, ByteArray?>> = paths.map { it to null }
-                repo.commitFiles(s.owner, s.name, branch, ops, message, null, null)
+                // Files: sha is already known from the directory listing.
+                val fileItems = selectedItems.filter { it.type == "file" }
+                for (item in fileItems) {
+                    repo.api.deleteFile(s.owner, s.name, item.path,
+                        DeleteFileRequest(message, item.sha, branch))
+                }
+                // Dirs: enumerate every blob inside via git-tree, then delete each file.
+                val dirItems = selectedItems.filter { it.type == "dir" }
+                if (dirItems.isNotEmpty()) {
+                    val branchInfo = repo.api.branch(s.owner, s.name, s.ref.ifBlank { "HEAD" })
+                    val parent = repo.api.commitDetail(s.owner, s.name, branchInfo.commit.sha)
+                    val ft = repo.api.gitTree(s.owner, s.name, parent.commit.tree.sha, recursive = 1)
+                    val prefixes = dirItems.map { it.path.trim('/') + "/" }
+                    val nested = ft.tree.filter { item ->
+                        item.type == "blob" && prefixes.any { item.path.startsWith(it) }
+                    }
+                    for (item in nested) {
+                        repo.api.deleteFile(s.owner, s.name, item.path,
+                            DeleteFileRequest(message, item.sha, branch))
+                    }
+                }
                 clearSelection()
-                load(s.owner, s.name, s.path, s.ref); onDone()
+                load(s.owner, s.name, s.path, s.ref)
+                onDone()
             } catch (t: Throwable) {
                 val detail = if (t is retrofit2.HttpException)
                     runCatching { t.response()?.errorBody()?.string() }.getOrNull()
@@ -131,13 +149,13 @@ class FilesViewModel @Inject constructor(private val repo: GitHubRepository) : V
     }
 
     /**
-     * Delete a folder and everything inside it as one atomic commit.
-     * GitHub has no "delete folder" REST endpoint — we have to enumerate the
-     * folder via the Git Tree API and emit a tree commit that removes every
-     * blob under that path.
+     * Delete every file inside a folder using GitHub's Contents DELETE endpoint
+     * (one call per file). Avoids the Git Trees API entirely so there are no
+     * mode / sha-content 422 errors.
      */
     fun deleteFolder(folderPath: String, message: String, onDone: () -> Unit) {
         val s = _state.value
+        val branch = s.ref.ifBlank { null }
         viewModelScope.launch {
             try {
                 val branchName = s.ref.ifBlank { "HEAD" }
@@ -145,17 +163,18 @@ class FilesViewModel @Inject constructor(private val repo: GitHubRepository) : V
                 val parent = repo.api.commitDetail(s.owner, s.name, branchInfo.commit.sha)
                 val ft = repo.api.gitTree(s.owner, s.name, parent.commit.tree.sha, recursive = 1)
                 val prefix = folderPath.trim('/') + "/"
-                val toDelete = ft.tree
-                    .filter { it.type == "blob" && it.path.startsWith(prefix) }
-                    .map { it.path }
-                android.util.Log.d("FilesVM", "deleteFolder $folderPath: ${toDelete.size} blobs on branch $branchName")
-                if (toDelete.isEmpty()) {
+                val blobs = ft.tree.filter { it.type == "blob" && it.path.startsWith(prefix) }
+                android.util.Log.d("FilesVM", "deleteFolder $folderPath: ${blobs.size} blobs")
+                if (blobs.isEmpty()) {
                     _state.value = _state.value.copy(error = "Folder is empty or already deleted")
                     onDone(); return@launch
                 }
-                val ops: List<Pair<String, ByteArray?>> = toDelete.map { it to null }
-                repo.commitFiles(s.owner, s.name, branchName, ops, message, null, null)
-                load(s.owner, s.name, s.path, s.ref); onDone()
+                for (blob in blobs) {
+                    repo.api.deleteFile(s.owner, s.name, blob.path,
+                        DeleteFileRequest(message, blob.sha, branch))
+                }
+                load(s.owner, s.name, s.path, s.ref)
+                onDone()
             } catch (t: Throwable) {
                 val detail = if (t is retrofit2.HttpException)
                     runCatching { t.response()?.errorBody()?.string() }.getOrNull()
@@ -167,22 +186,4 @@ class FilesViewModel @Inject constructor(private val repo: GitHubRepository) : V
         }
     }
 
-    /**
-     * Resolve a mixed selection of files + directories into a flat list of
-     * blob paths (so a single tree commit can delete everything atomically).
-     */
-    private suspend fun expandPaths(
-        owner: String, name: String, ref: String, items: List<GhContent>
-    ): List<String> {
-        val files = items.filter { it.type == "file" }.map { it.path }
-        val dirs = items.filter { it.type == "dir" }
-        if (dirs.isEmpty()) return files
-        val branchInfo = repo.api.branch(owner, name, ref.ifBlank { "HEAD" })
-        val parent = repo.api.commitDetail(owner, name, branchInfo.commit.sha)
-        val ft = repo.api.gitTree(owner, name, parent.commit.tree.sha, recursive = 1)
-        val dirPaths = dirs.map { it.path.trim('/') + "/" }
-        val nested = ft.tree.filter { it.type == "blob" && dirPaths.any { p -> it.path.startsWith(p) } }
-            .map { it.path }
-        return (files + nested).distinct()
-    }
 }

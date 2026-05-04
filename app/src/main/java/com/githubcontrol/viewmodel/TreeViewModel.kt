@@ -104,21 +104,30 @@ class TreeViewModel @Inject constructor(private val repo: GitHubRepository) : Vi
         }
     }
 
-    /** Bulk delete selected blob paths via a single tree commit. */
+    /** Bulk delete selected blob paths using the Contents DELETE endpoint (one call per file). */
     suspend fun deleteSelected(owner: String, name: String, branch: String) {
-        val paths = selectedPaths()
-        if (paths.isEmpty()) return
-        Logger.w("Tree", "deleting ${paths.size} file(s) from $owner/$name@$branch")
-        val joined: List<Pair<String, ByteArray?>> = paths.map { it to null }
+        val selected = _state.value.items.filter { it.selected && it.type == "blob" }
+        if (selected.isEmpty()) return
+        Logger.w("Tree", "deleting ${selected.size} file(s) from $owner/$name@$branch")
         try {
             withContext(Dispatchers.IO) {
-                repo.commitFiles(owner, name, branch, joined, "Delete ${paths.size} file(s) from device", null, null)
+                for (item in selected) {
+                    repo.api.deleteFile(
+                        owner, name, item.path,
+                        com.githubcontrol.data.api.DeleteFileRequest(
+                            message = "Delete ${selected.size} file(s) from device",
+                            sha = item.sha,
+                            branch = branch.takeIf { it.isNotBlank() }
+                        )
+                    )
+                }
             }
-            Logger.i("Tree", "delete commit ok")
+            Logger.i("Tree", "delete ok (${selected.size} files)")
             clearSelection()
             load(owner, name, branch)
         } catch (t: Throwable) {
-            Logger.e("Tree", "delete commit failed", t)
+            Logger.e("Tree", "delete failed", t)
+            _state.value = _state.value.copy(error = t.message)
         }
     }
 
