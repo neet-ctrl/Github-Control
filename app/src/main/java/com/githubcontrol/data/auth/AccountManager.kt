@@ -33,36 +33,38 @@ class AccountManager @Inject constructor(
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    private val keyAccounts = "accounts_json"
-    private val keyActive = stringPreferencesKey("active_account_id")
-    private val keyBiometric = booleanPreferencesKey("biometric_enabled")
+    private val keyAccounts        = "accounts_json"
+    private val keyActive          = stringPreferencesKey("active_account_id")
+    private val keyBiometric       = booleanPreferencesKey("biometric_enabled")
     private val keyAutoLockMinutes = intPreferencesKey("auto_lock_minutes")
-    private val keyTheme = stringPreferencesKey("theme_mode") // light/dark/system
-    private val keyDangerous = booleanPreferencesKey("dangerous_mode")
-    private val keyLastActive = longPreferencesKey("last_active_at")
-    private val keyAuthorName = stringPreferencesKey("author_name")
-    private val keyAuthorEmail = stringPreferencesKey("author_email")
-    private val keyDefaultBranch = stringPreferencesKey("default_branch_pref")
-    // ----- Appearance / customization -----
-    private val keyAccent = stringPreferencesKey("accent_color")           // palette key e.g. "blue"
-    private val keyDynamic = booleanPreferencesKey("dynamic_color")        // Material You
-    private val keyAmoled = booleanPreferencesKey("amoled_dark")           // pitch-black dark
-    private val keyFontScale = floatPreferencesKey("font_scale")           // 0.85..1.4
-    private val keyMonoScale = floatPreferencesKey("mono_font_scale")      // 0.8..1.4
-    private val keyDensity = stringPreferencesKey("density")               // compact/comfortable/cozy
-    private val keyCorner = intPreferencesKey("corner_radius")             // 0..28
-    private val keyTerminalTheme = stringPreferencesKey("terminal_theme")  // github/dracula/solarized/mono
-    private val keyOnboardingDone = booleanPreferencesKey("onboarding_completed")
-    private val keyLastRoute = stringPreferencesKey("last_route")
+    private val keyTheme           = stringPreferencesKey("theme_mode")
+    private val keyDangerous       = booleanPreferencesKey("dangerous_mode")
+    private val keyLastActive      = longPreferencesKey("last_active_at")
+    private val keyAuthorName      = stringPreferencesKey("author_name")
+    private val keyAuthorEmail     = stringPreferencesKey("author_email")
+    private val keyDefaultBranch   = stringPreferencesKey("default_branch_pref")
+    private val keyAccent          = stringPreferencesKey("accent_color")
+    private val keyDynamic         = booleanPreferencesKey("dynamic_color")
+    private val keyAmoled          = booleanPreferencesKey("amoled_dark")
+    private val keyFontScale       = floatPreferencesKey("font_scale")
+    private val keyMonoScale       = floatPreferencesKey("mono_font_scale")
+    private val keyDensity         = stringPreferencesKey("density")
+    private val keyCorner          = intPreferencesKey("corner_radius")
+    private val keyTerminalTheme   = stringPreferencesKey("terminal_theme")
+    private val keyOnboardingDone  = booleanPreferencesKey("onboarding_completed")
+    private val keyLastRoute       = stringPreferencesKey("last_route")
+    // App Lock
+    private val keyAppLockEnabled  = booleanPreferencesKey("app_lock_enabled")
+    private val keyAppLockMethod   = stringPreferencesKey("app_lock_method")
+    private val keyAppLockHash     = stringPreferencesKey("app_lock_hash")
+    // Cache
+    private val keyAutoClearCache  = booleanPreferencesKey("auto_clear_cache")
+    private val keyLastCacheCleared = longPreferencesKey("last_cache_cleared")
 
     val rateRemaining = MutableStateFlow<Int?>(null)
     fun updateRateRemaining(v: Int) { rateRemaining.value = v }
 
-    val accountsFlow: Flow<List<Account>> = context.dataStore.data.map {
-        // accounts are in encrypted prefs, but we still need a stream trigger
-        loadAccounts()
-    }
-
+    val accountsFlow: Flow<List<Account>> = context.dataStore.data.map { loadAccounts() }
     val activeAccountIdFlow: Flow<String?> = context.dataStore.data.map { it[keyActive] }
     val biometricEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[keyBiometric] ?: false }
     val autoLockMinutesFlow: Flow<Int> = context.dataStore.data.map { it[keyAutoLockMinutes] ?: 5 }
@@ -79,10 +81,14 @@ class AccountManager @Inject constructor(
     val cornerRadiusFlow: Flow<Int> = context.dataStore.data.map { it[keyCorner] ?: 14 }
     val terminalThemeFlow: Flow<String> = context.dataStore.data.map { it[keyTerminalTheme] ?: "github-dark" }
     val onboardingCompletedFlow: Flow<Boolean> = context.dataStore.data.map { it[keyOnboardingDone] ?: false }
-    suspend fun setOnboardingCompleted(done: Boolean) =
-        context.dataStore.edit { it[keyOnboardingDone] = done }
-
     val lastRouteFlow: Flow<String?> = context.dataStore.data.map { it[keyLastRoute] }
+    // App Lock flows
+    val appLockEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[keyAppLockEnabled] ?: false }
+    val appLockMethodFlow: Flow<String>   = context.dataStore.data.map { it[keyAppLockMethod] ?: "pin" }
+    // Cache flows
+    val autoClearCacheFlow: Flow<Boolean> = context.dataStore.data.map { it[keyAutoClearCache] ?: false }
+
+    suspend fun setOnboardingCompleted(done: Boolean) = context.dataStore.edit { it[keyOnboardingDone] = done }
     suspend fun setLastRoute(route: String) = context.dataStore.edit { it[keyLastRoute] = route }
     suspend fun lastRoute(): String? = context.dataStore.data.first()[keyLastRoute]
 
@@ -110,9 +116,7 @@ class AccountManager @Inject constructor(
         if (makeActive) setActive(account.id)
     }
 
-    suspend fun setActive(id: String) {
-        context.dataStore.edit { it[keyActive] = id }
-    }
+    suspend fun setActive(id: String) { context.dataStore.edit { it[keyActive] = id } }
 
     suspend fun removeAccount(id: String) {
         val list = loadAccounts().filterNot { it.id == id }
@@ -133,58 +137,73 @@ class AccountManager @Inject constructor(
     fun accountsBlocking(): List<Account> = loadAccounts()
 
     suspend fun setBiometric(enabled: Boolean) = context.dataStore.edit { it[keyBiometric] = enabled }
-    suspend fun setAutoLockMinutes(min: Int) = context.dataStore.edit { it[keyAutoLockMinutes] = min }
-    suspend fun setTheme(mode: String) = context.dataStore.edit { it[keyTheme] = mode }
-    suspend fun setDangerous(enabled: Boolean) = context.dataStore.edit { it[keyDangerous] = enabled }
-    suspend fun touchActivity() = context.dataStore.edit { it[keyLastActive] = System.currentTimeMillis() }
-    suspend fun lastActiveAt(): Long = context.dataStore.data.first()[keyLastActive] ?: 0L
+    suspend fun setAutoLockMinutes(min: Int)   = context.dataStore.edit { it[keyAutoLockMinutes] = min }
+    suspend fun setTheme(mode: String)          = context.dataStore.edit { it[keyTheme] = mode }
+    suspend fun setDangerous(enabled: Boolean)  = context.dataStore.edit { it[keyDangerous] = enabled }
+    suspend fun touchActivity()                 = context.dataStore.edit { it[keyLastActive] = System.currentTimeMillis() }
+    suspend fun lastActiveAt(): Long            = context.dataStore.data.first()[keyLastActive] ?: 0L
     suspend fun setAuthor(name: String?, email: String?) = context.dataStore.edit {
-        if (name == null) it.remove(keyAuthorName) else it[keyAuthorName] = name
+        if (name  == null) it.remove(keyAuthorName)  else it[keyAuthorName]  = name
         if (email == null) it.remove(keyAuthorEmail) else it[keyAuthorEmail] = email
     }
-
-    suspend fun setAccent(palette: String) = context.dataStore.edit { it[keyAccent] = palette }
-    suspend fun setDynamicColor(enabled: Boolean) = context.dataStore.edit { it[keyDynamic] = enabled }
-    suspend fun setAmoled(enabled: Boolean) = context.dataStore.edit { it[keyAmoled] = enabled }
-    suspend fun setFontScale(scale: Float) = context.dataStore.edit { it[keyFontScale] = scale.coerceIn(0.7f, 1.6f) }
-    suspend fun setMonoFontScale(scale: Float) = context.dataStore.edit { it[keyMonoScale] = scale.coerceIn(0.7f, 1.6f) }
-    suspend fun setDensity(value: String) = context.dataStore.edit { it[keyDensity] = value }
-    suspend fun setCornerRadius(dp: Int) = context.dataStore.edit { it[keyCorner] = dp.coerceIn(0, 28) }
-    suspend fun setTerminalTheme(value: String) = context.dataStore.edit { it[keyTerminalTheme] = value }
+    suspend fun setAccent(palette: String)     = context.dataStore.edit { it[keyAccent] = palette }
+    suspend fun setDynamicColor(on: Boolean)   = context.dataStore.edit { it[keyDynamic] = on }
+    suspend fun setAmoled(on: Boolean)         = context.dataStore.edit { it[keyAmoled]  = on }
+    suspend fun setFontScale(s: Float)         = context.dataStore.edit { it[keyFontScale]  = s.coerceIn(0.7f, 1.6f) }
+    suspend fun setMonoFontScale(s: Float)     = context.dataStore.edit { it[keyMonoScale]  = s.coerceIn(0.7f, 1.6f) }
+    suspend fun setDensity(value: String)      = context.dataStore.edit { it[keyDensity] = value }
+    suspend fun setCornerRadius(dp: Int)       = context.dataStore.edit { it[keyCorner]  = dp.coerceIn(0, 28) }
+    suspend fun setTerminalTheme(value: String)= context.dataStore.edit { it[keyTerminalTheme] = value }
     suspend fun resetAppearance() = context.dataStore.edit {
         it.remove(keyAccent); it.remove(keyDynamic); it.remove(keyAmoled)
         it.remove(keyFontScale); it.remove(keyMonoScale); it.remove(keyDensity)
         it.remove(keyCorner); it.remove(keyTerminalTheme); it[keyTheme] = "system"
     }
 
-    /** Update the cached OAuth scopes for an existing account (parsed from response headers). */
+    // ── App Lock ───────────────────────────────────────────────────────────────
+    suspend fun setAppLock(enabled: Boolean, method: String, hash: String) =
+        context.dataStore.edit {
+            it[keyAppLockEnabled] = enabled
+            it[keyAppLockMethod]  = method
+            it[keyAppLockHash]    = hash
+        }
+
+    suspend fun clearAppLock() = context.dataStore.edit {
+        it.remove(keyAppLockEnabled)
+        it.remove(keyAppLockMethod)
+        it.remove(keyAppLockHash)
+    }
+
+    suspend fun getAppLockHash(): String? = context.dataStore.data.first()[keyAppLockHash]
+
+    // ── Cache ──────────────────────────────────────────────────────────────────
+    suspend fun setAutoClearCache(enabled: Boolean) = context.dataStore.edit { it[keyAutoClearCache] = enabled }
+    suspend fun setLastCacheCleared() = context.dataStore.edit { it[keyLastCacheCleared] = System.currentTimeMillis() }
+    suspend fun lastCacheClearedAt(): Long = context.dataStore.data.first()[keyLastCacheCleared] ?: 0L
+
+    // ── Accounts (misc) ────────────────────────────────────────────────────────
     suspend fun updateScopes(id: String, scopes: List<String>) {
         val list = loadAccounts().toMutableList()
         val idx = list.indexOfFirst { it.id == id }
-        if (idx >= 0) {
-            list[idx] = list[idx].copy(scopes = scopes)
-            saveAccounts(list)
-        }
+        if (idx >= 0) { list[idx] = list[idx].copy(scopes = scopes); saveAccounts(list) }
     }
 
-    /** Append a new validation record to the account's history (kept bounded). */
     suspend fun recordValidation(id: String, validation: TokenValidation, refreshScopes: Boolean = true) {
         val list = loadAccounts().toMutableList()
-        val idx = list.indexOfFirst { it.id == id }
+        val idx  = list.indexOfFirst { it.id == id }
         if (idx < 0) return
-        val current = list[idx]
+        val current    = list[idx]
         val newHistory = (listOf(validation) + current.validations).take(20)
         list[idx] = current.copy(
-            validations = newHistory,
+            validations     = newHistory,
             lastValidatedAt = validation.ts,
-            scopes = if (refreshScopes && validation.ok) validation.scopes.ifEmpty { current.scopes } else current.scopes,
-            tokenType = validation.tokenType ?: current.tokenType,
-            tokenExpiry = validation.tokenExpiry ?: current.tokenExpiry
+            scopes          = if (refreshScopes && validation.ok) validation.scopes.ifEmpty { current.scopes } else current.scopes,
+            tokenType       = validation.tokenType  ?: current.tokenType,
+            tokenExpiry     = validation.tokenExpiry ?: current.tokenExpiry
         )
         saveAccounts(list)
     }
 
-    /** Returns the list of recommended scopes that are missing from the active token. */
     suspend fun missingScopes(required: List<String> = ScopeCatalog.recommended): List<String> {
         val have = activeAccount()?.scopes ?: return required
         return required.filterNot { req -> have.any { it == req || it.startsWith("$req:") } }

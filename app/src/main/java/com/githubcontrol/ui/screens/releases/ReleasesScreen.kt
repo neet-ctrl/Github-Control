@@ -513,25 +513,54 @@ private fun ReleaseCard(
 
                 Spacer(Modifier.height(4.dp))
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Published ${RelativeTime.ago(release.publishedAt ?: release.createdAt)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    release.targetCommitish?.let { target ->
-                        Text(
-                            "@ $target",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                Text(
+                    "Published ${RelativeTime.ago(release.publishedAt ?: release.createdAt)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // Initiating commit — shown prominently with a dedicated row
+                release.targetCommitish?.let { target ->
+                    Spacer(Modifier.height(4.dp))
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.Commit,
+                                contentDescription = null,
+                                modifier = Modifier.size(13.dp),
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                            Text(
+                                "Initiated from",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            // If it looks like a full 40-char SHA, abbreviate to 7 chars
+                            val display = if (target.length == 40 && target.all { c -> c.isLetterOrDigit() })
+                                target.take(7)
+                            else
+                                target
+                            Text(
+                                display,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.secondary,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            )
+                        }
                     }
                 }
 
                 release.author?.let { author ->
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         "by ${author.login}",
                         style = MaterialTheme.typography.labelSmall,

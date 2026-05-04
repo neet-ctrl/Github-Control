@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -34,6 +35,7 @@ import com.githubcontrol.data.auth.TokenValidator
 import com.githubcontrol.ui.components.EmbeddedTerminal
 import com.githubcontrol.ui.components.GhBadge
 import com.githubcontrol.ui.components.GhCard
+import com.githubcontrol.utils.SettingsBackup
 import com.githubcontrol.utils.ShareUtils
 import com.githubcontrol.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
@@ -41,6 +43,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,16 +54,46 @@ import androidx.compose.ui.graphics.Color
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(vm: MainViewModel, onSignedIn: () -> Unit) {
-    var token by remember { mutableStateOf("") }
+    var token   by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
-    val busy by vm.loginBusy.collectAsState()
-    val err by vm.loginError.collectAsState()
-    val ctx = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val busy    by vm.loginBusy.collectAsState()
+    val err     by vm.loginError.collectAsState()
+    val ctx     = LocalContext.current
+    val scope   = rememberCoroutineScope()
 
-    var preview by remember { mutableStateOf<TokenValidator.Result?>(null) }
+    var preview  by remember { mutableStateOf<TokenValidator.Result?>(null) }
     var checking by remember { mutableStateOf(false) }
     val tokenType = remember(token) { if (token.isNotBlank()) TokenValidator.classify(token) else null }
+
+    // Backup import launcher
+    var importBusy by remember { mutableStateOf(false) }
+    var importMsg  by remember { mutableStateOf<String?>(null) }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                importBusy = true
+                importMsg  = null
+                runCatching {
+                    val text   = SettingsBackup.readFromUri(ctx, uri) ?: error("empty file")
+                    val backup = SettingsBackup.decode(text)
+                    SettingsBackup.apply(vm.accountManager, backup)
+                }.onSuccess { added ->
+                    if (added > 0) {
+                        vm.refresh()
+                        importMsg = null
+                        onSignedIn()           // go straight to the app
+                    } else {
+                        importMsg = "No new accounts found in the backup file."
+                    }
+                }.onFailure {
+                    importMsg = "Import failed: ${it.message}"
+                }
+                importBusy = false
+            }
+        }
+    }
 
     Scaffold(topBar = { CenterAlignedTopAppBar(title = { Text("GitHub Control") }) }) { pad ->
         Column(
@@ -83,34 +117,28 @@ fun LoginScreen(vm: MainViewModel, onSignedIn: () -> Unit) {
                     visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { visible = !visible }) {
-                            Icon(if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = null)
+                            Icon(if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, null)
                         }
                     }
                 )
                 if (tokenType != null) {
                     Spacer(Modifier.height(6.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        GhBadge(
-                            tokenType.uppercase(),
-                            color = when (tokenType) {
-                                "fine-grained" -> MaterialTheme.colorScheme.primary
-                                "classic" -> MaterialTheme.colorScheme.tertiary
-                                "unknown" -> MaterialTheme.colorScheme.error
-                                else -> MaterialTheme.colorScheme.secondary
-                            }
-                        )
-                        Text("${token.length} chars", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        GhBadge(tokenType.uppercase(), color = when (tokenType) {
+                            "fine-grained" -> MaterialTheme.colorScheme.primary
+                            "classic"      -> MaterialTheme.colorScheme.tertiary
+                            "unknown"      -> MaterialTheme.colorScheme.error
+                            else           -> MaterialTheme.colorScheme.secondary
+                        })
+                        Text("${token.length} chars", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         onClick = {
-                            scope.launch {
-                                checking = true
-                                preview = vm.previewValidate(token)
-                                checking = false
-                            }
+                            scope.launch { checking = true; preview = vm.previewValidate(token); checking = false }
                         },
                         enabled = token.isNotBlank() && !checking,
                         modifier = Modifier.weight(1f)
@@ -129,23 +157,17 @@ fun LoginScreen(vm: MainViewModel, onSignedIn: () -> Unit) {
                 }
             }
 
-            if (err != null) {
-                Text(err!!, color = MaterialTheme.colorScheme.error)
-            }
+            if (err != null) { Text(err!!, color = MaterialTheme.colorScheme.error) }
 
             preview?.let { p ->
                 GhCard {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            if (p.ok) Icons.Filled.CheckCircle else Icons.Filled.Error, null,
-                            tint = if (p.ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                        )
+                        Icon(if (p.ok) Icons.Filled.CheckCircle else Icons.Filled.Error, null,
+                            tint = if (p.ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
                         Spacer(Modifier.width(8.dp))
-                        Text(
-                            if (p.ok) "Token is valid" else "Token rejected",
+                        Text(if (p.ok) "Token is valid" else "Token rejected",
                             style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                            color = if (p.ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                        )
+                            color = if (p.ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
                     }
                     if (p.ok) {
                         Spacer(Modifier.height(6.dp))
@@ -154,14 +176,12 @@ fun LoginScreen(vm: MainViewModel, onSignedIn: () -> Unit) {
                             Text("public repos: ${p.publicRepos}  ·  followers: ${p.followers}",
                                 style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    val rl = p.validation.rateLimit
-                    val rm = p.validation.rateMax
-                    val expiry = p.validation.tokenExpiry
-                    val type = p.validation.tokenType
+                    val rl = p.validation.rateLimit; val rm = p.validation.rateMax
+                    val expiry = p.validation.tokenExpiry; val type = p.validation.tokenType
                     Spacer(Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (type != null) GhBadge(type.uppercase())
-                        if (rl != null) GhBadge("rate $rl${if (rm != null) "/$rm" else ""}")
+                        if (type != null)   GhBadge(type.uppercase())
+                        if (rl   != null)   GhBadge("rate $rl${if (rm != null) "/$rm" else ""}")
                         if (expiry != null) GhBadge("expires $expiry", MaterialTheme.colorScheme.tertiary)
                     }
                     if (p.error != null) {
@@ -175,14 +195,11 @@ fun LoginScreen(vm: MainViewModel, onSignedIn: () -> Unit) {
                         p.scopes.forEach { sc ->
                             val info = ScopeCatalog.describe(sc)
                             Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(vertical = 3.dp)) {
-                                GhBadge(
-                                    sc, color = when (info.risk) {
-                                        ScopeCatalog.Risk.CRITICAL -> MaterialTheme.colorScheme.error
-                                        ScopeCatalog.Risk.HIGH -> MaterialTheme.colorScheme.error
-                                        ScopeCatalog.Risk.MEDIUM -> MaterialTheme.colorScheme.tertiary
-                                        ScopeCatalog.Risk.LOW -> MaterialTheme.colorScheme.primary
-                                    }
-                                )
+                                GhBadge(sc, color = when (info.risk) {
+                                    ScopeCatalog.Risk.CRITICAL, ScopeCatalog.Risk.HIGH -> MaterialTheme.colorScheme.error
+                                    ScopeCatalog.Risk.MEDIUM -> MaterialTheme.colorScheme.tertiary
+                                    ScopeCatalog.Risk.LOW    -> MaterialTheme.colorScheme.primary
+                                })
                                 Spacer(Modifier.width(8.dp))
                                 Column {
                                     Text(info.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
@@ -192,11 +209,8 @@ fun LoginScreen(vm: MainViewModel, onSignedIn: () -> Unit) {
                         }
                     } else if (p.ok) {
                         Spacer(Modifier.height(6.dp))
-                        Text(
-                            "GitHub did not return any scope headers — this is normal for fine-grained tokens. Permissions can be inspected at github.com/settings/tokens.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("GitHub did not return any scope headers — this is normal for fine-grained tokens.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     val recommended = ScopeCatalog.recommended.filterNot { req -> p.scopes.any { it == req || it.startsWith("$req:") } }
                     if (p.ok && recommended.isNotEmpty()) {
@@ -213,6 +227,44 @@ fun LoginScreen(vm: MainViewModel, onSignedIn: () -> Unit) {
                 }
             }
 
+            // ── Import from backup ─────────────────────────────────────────
+            GhCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Restore, null, tint = MaterialTheme.colorScheme.secondary)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Already have a backup?", fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Import a backup file to sign in to all your accounts instantly — no PAT pasting required.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                importMsg?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.height(4.dp))
+                }
+                Button(
+                    onClick = { importLauncher.launch(arrayOf("application/json")) },
+                    enabled = !importBusy,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                ) {
+                    if (importBusy) {
+                        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Importing…")
+                    } else {
+                        Icon(Icons.Filled.Restore, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Import backup file")
+                    }
+                }
+            }
+
             PatGuideCard()
 
             EmbeddedTerminal(section = "TokenValidator")
@@ -220,19 +272,13 @@ fun LoginScreen(vm: MainViewModel, onSignedIn: () -> Unit) {
     }
 }
 
-/**
- * Interactive step-by-step guide that teaches users how to generate a GitHub
- * Personal Access Token with every permission this app needs. Two collapsible
- * sections (Classic vs Fine-grained) and a one-tap link that opens GitHub with
- * all recommended scopes pre-selected.
- */
 @Composable
 private fun PatGuideCard() {
     val ctx = LocalContext.current
-    var classicOpen by remember { mutableStateOf(true) }
+    var classicOpen     by remember { mutableStateOf(true) }
     var fineGrainedOpen by remember { mutableStateOf(false) }
     val recommended = ScopeCatalog.recommended
-    val classicUrl = "https://github.com/settings/tokens/new" +
+    val classicUrl  = "https://github.com/settings/tokens/new" +
         "?scopes=${recommended.joinToString(",")}" +
         "&description=GitHub%20Control%20Android"
     val fineGrainedUrl = "https://github.com/settings/personal-access-tokens/new"
@@ -241,112 +287,59 @@ private fun PatGuideCard() {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.Help, null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(8.dp))
-            Text(
-                "How to create a Personal Access Token",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
+            Text("How to create a Personal Access Token",
+                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.height(6.dp))
-        Text(
-            "A PAT is a long string GitHub gives you that lets this app act on your behalf. " +
-                "You only need to make one. It is stored encrypted on this device and never sent anywhere else.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text("A PAT is a long string GitHub gives you that lets this app act on your behalf. It is stored encrypted on this device and never sent anywhere else.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         Spacer(Modifier.height(10.dp))
-        Button(
-            onClick = { ShareUtils.openInBrowser(ctx, classicUrl) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(Icons.Filled.OpenInBrowser, null)
-            Spacer(Modifier.width(6.dp))
+        Button(onClick = { ShareUtils.openInBrowser(ctx, classicUrl) }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.OpenInBrowser, null); Spacer(Modifier.width(6.dp))
             Text("Open GitHub with all scopes pre-selected")
         }
         Spacer(Modifier.height(4.dp))
-        Text(
-            "This opens github.com/settings/tokens/new with every recommended scope already ticked — " +
-                "just set an expiry, click \"Generate token\", copy the token, and paste it above.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text("Opens github.com/settings/tokens/new with every recommended scope already ticked — just set an expiry, click \"Generate token\", copy the token, and paste it above.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         Spacer(Modifier.height(14.dp))
-        SectionHeader(
-            title = "Option A — Classic token (easiest)",
-            badge = "recommended",
-            open = classicOpen,
-            onToggle = { classicOpen = !classicOpen }
-        )
+        SectionHeader("Option A — Classic token (easiest)", "recommended", classicOpen) { classicOpen = !classicOpen }
         AnimatedVisibility(visible = classicOpen) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
                 Step(1, "On a browser sign in to your GitHub account.")
-                Step(2, "Tap the button above (or open github.com → top-right avatar → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token (classic)).")
-                Step(3, "Give it a name like \"GitHub Control on my phone\" so you can recognise it later.")
-                Step(4, "Pick an expiry. 90 days is a good balance; pick \"No expiration\" only if you really want to.")
-                Step(5, "Tick every scope listed below. The pre-filled link does this for you automatically.")
-                Step(6, "Scroll down and tap Generate token. GitHub will show the token only once.")
-                Step(7, "Tap the copy icon next to the token, then come back to this app and paste it in the field above.")
+                Step(2, "Tap the button above (or go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)).")
+                Step(3, "Give it a name like \"GitHub Control on my phone\".")
+                Step(4, "Pick an expiry. 90 days is a good balance.")
+                Step(5, "Tick every scope listed below. The pre-filled link does this automatically.")
+                Step(6, "Click Generate token. GitHub shows the token only once.")
+                Step(7, "Copy the token and paste it in the field above.")
                 Spacer(Modifier.height(4.dp))
                 Text("Scopes you need:", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
                 recommended.forEach { sc ->
                     val info = ScopeCatalog.describe(sc)
-                    ScopeRow(scope = sc, title = info.title, description = info.description, risk = info.risk)
+                    ScopeRow(sc, info.title, info.description, info.risk)
                 }
                 Spacer(Modifier.height(4.dp))
                 OutlinedButton(
-                    onClick = {
-                        copyToClipboard(ctx, "scopes",
-                            recommended.joinToString(", "))
-                    },
+                    onClick = { copyToClipboard(ctx, "scopes", recommended.joinToString(", ")) },
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Filled.ContentCopy, null); Spacer(Modifier.width(6.dp))
-                    Text("Copy the scope list")
-                }
+                ) { Icon(Icons.Filled.ContentCopy, null); Spacer(Modifier.width(6.dp)); Text("Copy the scope list") }
             }
         }
 
         Spacer(Modifier.height(12.dp))
-        SectionHeader(
-            title = "Option B — Fine-grained token (more secure, more setup)",
-            badge = null,
-            open = fineGrainedOpen,
-            onToggle = { fineGrainedOpen = !fineGrainedOpen }
-        )
+        SectionHeader("Option B — Fine-grained token (more secure)", null, fineGrainedOpen) { fineGrainedOpen = !fineGrainedOpen }
         AnimatedVisibility(visible = fineGrainedOpen) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
-                Step(1, "Open github.com → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token (or tap below).")
-                Step(2, "Token name: e.g. \"GitHub Control Android\". Set expiry (90 days is typical).")
-                Step(3, "Resource owner: yourself, or an organisation you administer.")
-                Step(4, "Repository access: pick All repositories (or only the ones you need).")
-                Step(5, "Repository permissions — set each of these to Read and write:")
-                Bullet("Contents — code, files, branches")
-                Bullet("Pull requests — open / merge / review")
-                Bullet("Issues — comments, labels, assignees")
-                Bullet("Workflows — modify .github/workflows files")
-                Bullet("Actions — start / cancel workflow runs")
-                Bullet("Webhooks — only if you want to manage them")
-                Step(6, "Account permissions — set:")
-                Bullet("Email addresses — Read")
-                Bullet("Followers — Read")
-                Bullet("SSH signing keys / GPG keys — Read")
-                Bullet("Profile — Read and write (if you want to edit it from the app)")
-                Step(7, "Tap Generate token, copy it, and paste it above.")
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Note: fine-grained tokens cannot delete repositories. If you want the in-app delete button to work, use the classic option above.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.tertiary
-                )
-                Spacer(Modifier.height(4.dp))
-                OutlinedButton(
-                    onClick = { ShareUtils.openInBrowser(ctx, fineGrainedUrl) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Filled.OpenInBrowser, null); Spacer(Modifier.width(6.dp))
-                    Text("Open the fine-grained token page")
+                Step(1, "GitHub → Settings → Developer settings → Fine-grained tokens → Generate new token (or tap below).")
+                Step(2, "Token name + expiry.")
+                Step(3, "Repository access: All repositories.")
+                Step(4, "Repository permissions: Contents, Pull requests, Issues, Workflows, Actions → Read and write.")
+                Step(5, "Account permissions: Email addresses, Followers, SSH signing keys → Read.")
+                Step(6, "Generate token, copy it, paste it above.")
+                OutlinedButton(onClick = { ShareUtils.openInBrowser(ctx, fineGrainedUrl) }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.OpenInBrowser, null); Spacer(Modifier.width(6.dp)); Text("Open fine-grained token page")
                 }
             }
         }
@@ -357,32 +350,21 @@ private fun PatGuideCard() {
             Spacer(Modifier.width(6.dp))
             Text("Where the token lives", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
         }
-        Text(
-            "Stored only on this device using AndroidX EncryptedSharedPreferences (Tink/AES-256-GCM). " +
-                "It is sent to api.github.com over HTTPS only, never to anyone else. You can revoke it any " +
-                "time at github.com/settings/tokens.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text("Stored only on this device using AndroidX EncryptedSharedPreferences (AES-256-GCM). Sent to api.github.com over HTTPS only, never to anyone else.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 private fun SectionHeader(title: String, badge: String?, open: Boolean, onToggle: () -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
         verticalAlignment = Alignment.CenterVertically
     ) {
         TextButton(onClick = onToggle, modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                if (badge != null) {
-                    GhBadge(badge, color = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(6.dp))
-                }
+                if (badge != null) { GhBadge(badge, color = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(6.dp)) }
                 Icon(if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, null)
             }
         }
@@ -392,19 +374,10 @@ private fun SectionHeader(title: String, badge: String?, open: Boolean, onToggle
 @Composable
 private fun Step(number: Int, text: String) {
     Row(verticalAlignment = Alignment.Top) {
-        Box(
-            modifier = Modifier
-                .size(22.dp)
-                .clip(RoundedCornerShape(11.dp))
-                .background(MaterialTheme.colorScheme.primary)
-        ) {
-            Text(
-                "$number",
-                modifier = Modifier.align(Alignment.Center),
+        Box(Modifier.size(22.dp).clip(RoundedCornerShape(11.dp)).background(MaterialTheme.colorScheme.primary)) {
+            Text("$number", modifier = Modifier.align(Alignment.Center),
                 color = MaterialTheme.colorScheme.onPrimary,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold
-            )
+                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.width(8.dp))
         Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -412,24 +385,13 @@ private fun Step(number: Int, text: String) {
 }
 
 @Composable
-private fun Bullet(text: String) {
-    Row(modifier = Modifier.padding(start = 30.dp)) {
-        Text("• ", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
 private fun ScopeRow(scope: String, title: String, description: String, risk: ScopeCatalog.Risk) {
     Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(vertical = 3.dp)) {
-        GhBadge(
-            scope,
-            color = when (risk) {
-                ScopeCatalog.Risk.CRITICAL, ScopeCatalog.Risk.HIGH -> MaterialTheme.colorScheme.error
-                ScopeCatalog.Risk.MEDIUM -> MaterialTheme.colorScheme.tertiary
-                ScopeCatalog.Risk.LOW -> MaterialTheme.colorScheme.primary
-            }
-        )
+        GhBadge(scope, color = when (risk) {
+            ScopeCatalog.Risk.CRITICAL, ScopeCatalog.Risk.HIGH -> MaterialTheme.colorScheme.error
+            ScopeCatalog.Risk.MEDIUM -> MaterialTheme.colorScheme.tertiary
+            ScopeCatalog.Risk.LOW    -> MaterialTheme.colorScheme.primary
+        })
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)

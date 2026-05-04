@@ -8,7 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,18 +26,19 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String) -> Unit) {
-    val ctx = LocalContext.current
-    val theme by main.accountManager.themeFlow.collectAsState(initial = "system")
+    val ctx     = LocalContext.current
+    val theme   by main.accountManager.themeFlow.collectAsState(initial = "system")
     val biometric by main.accountManager.biometricEnabledFlow.collectAsState(initial = false)
     val dangerous by main.accountManager.dangerousModeFlow.collectAsState(initial = false)
-    val autoLock by main.accountManager.autoLockMinutesFlow.collectAsState(initial = 5)
-    val scope = rememberCoroutineScope()
-    var wipeDialog by remember { mutableStateOf(false) }
-    var updateMessage by remember { mutableStateOf<String?>(null) }
-    var checkingUpdates by remember { mutableStateOf(false) }
-    var lastBackupJson by remember { mutableStateOf<String?>(null) }
+    val autoLock  by main.accountManager.autoLockMinutesFlow.collectAsState(initial = 5)
+    val appLockEnabled by main.accountManager.appLockEnabledFlow.collectAsState(initial = false)
+    val appLockMethod  by main.accountManager.appLockMethodFlow.collectAsState(initial = "pin")
+    val scope   = rememberCoroutineScope()
+    var wipeDialog        by remember { mutableStateOf(false) }
+    var updateMessage     by remember { mutableStateOf<String?>(null) }
+    var checkingUpdates   by remember { mutableStateOf(false) }
+    var lastBackupJson    by remember { mutableStateOf<String?>(null) }
     var showExportWarning by remember { mutableStateOf(false) }
-    var importResult by remember { mutableStateOf<String?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -57,18 +58,17 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
         if (uri != null) {
             scope.launch {
                 runCatching {
-                    val text = SettingsBackup.readFromUri(ctx, uri) ?: error("empty file")
+                    val text   = SettingsBackup.readFromUri(ctx, uri) ?: error("empty file")
                     val backup = SettingsBackup.decode(text)
-                    val added = SettingsBackup.apply(main.accountManager, backup)
-                    // Refresh auth state so newly added accounts appear immediately
+                    val added  = SettingsBackup.apply(main.accountManager, backup)
                     main.refresh()
                     added
                 }.onSuccess { added ->
-                    importResult = if (added > 0)
+                    val msg = if (added > 0)
                         "Settings imported. $added account(s) logged in automatically."
                     else
-                        "Settings imported. All accounts were already present — nothing new added."
-                    Toast.makeText(ctx, importResult, Toast.LENGTH_LONG).show()
+                        "Settings imported. All accounts were already present."
+                    Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
                 }.onFailure {
                     Toast.makeText(ctx, "Import failed: ${it.message}", Toast.LENGTH_LONG).show()
                 }
@@ -86,6 +86,8 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
             Modifier.padding(pad).fillMaxSize().padding(12.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+
+            // Appearance
             GhCard {
                 Text("Appearance", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
@@ -99,8 +101,8 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
                     listOf("system", "light", "dark").forEach { mode ->
                         FilterChip(
                             selected = theme == mode,
-                            onClick = { scope.launch { main.accountManager.setTheme(mode) } },
-                            label = { Text(mode) }
+                            onClick  = { scope.launch { main.accountManager.setTheme(mode) } },
+                            label    = { Text(mode) }
                         )
                     }
                 }
@@ -110,6 +112,7 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
                 }
             }
 
+            // Security
             GhCard {
                 Text("Security", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(8.dp))
@@ -134,6 +137,42 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
                 Button(onClick = { main.lock() }, modifier = Modifier.padding(8.dp)) { Text("Lock now") }
             }
 
+            // App Lock
+            GhCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.LockPerson, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("App Lock", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (appLockEnabled)
+                                "Active · ${appLockMethod.replaceFirstChar { it.uppercase() }}"
+                            else
+                                "Disabled — add PIN, password, or pattern",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (appLockEnabled) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Protect the app with a PIN, password, or drawn pattern. Shown every time you open the app, independent of biometric.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = { onNavigate(Routes.APP_LOCK_SETUP) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Filled.GridView, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (appLockEnabled) "Change / Disable App Lock" else "Set up App Lock")
+                }
+            }
+
+            // Account
             GhCard {
                 Text("Account", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
@@ -142,6 +181,7 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
                 TextButton(onClick = { onNavigate(Routes.SSH_KEYS) }, modifier = Modifier.fillMaxWidth()) { Text("SSH keys") }
             }
 
+            // Tools
             GhCard {
                 Text("Tools", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
@@ -154,11 +194,34 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
                 TextButton(onClick = { onNavigate(Routes.HEALTH) }, modifier = Modifier.fillMaxWidth()) { Text("Health & status dashboard") }
             }
 
+            // Cache
+            GhCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Storage, null, tint = MaterialTheme.colorScheme.tertiary)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Cache", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Manage image cache, logs, and auto-clear schedule.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { onNavigate(Routes.CACHE) }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.CleaningServices, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Open cache manager")
+                }
+            }
+
+            // Backup & restore
             GhCard {
                 Text("Backup & restore", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Export saves all your settings AND your account PATs to a JSON file so a new device can log in automatically when you import.",
+                    "Export saves all settings AND account PATs so a new device can log in automatically when you import.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -168,15 +231,12 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Filled.Warning,
-                            null,
+                        Icon(Icons.Filled.Warning, null,
                             tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp)
-                        )
+                            modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            "The exported file contains your live GitHub tokens. Store it securely and never share it.",
+                            "Exported file contains live GitHub tokens — keep it secure.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             fontWeight = FontWeight.Medium
@@ -185,39 +245,24 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(
-                        onClick = { showExportWarning = true },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Export") }
-                    OutlinedButton(
-                        onClick = { importLauncher.launch(arrayOf("application/json")) },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Import") }
+                    Button(onClick = { showExportWarning = true }, modifier = Modifier.weight(1f)) { Text("Export") }
+                    OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json")) }, modifier = Modifier.weight(1f)) { Text("Import") }
                 }
             }
 
+            // Updates
             GhCard {
                 Text("Updates", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    "Check for a newer release on GitHub. The current version is shown on the About screen.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
                 Button(
                     enabled = !checkingUpdates,
                     onClick = {
-                        checkingUpdates = true
-                        updateMessage = null
+                        checkingUpdates = true; updateMessage = null
                         scope.launch {
                             val r = UpdateChecker.check()
                             checkingUpdates = false
                             updateMessage = r.fold(
-                                onSuccess = {
-                                    if (it.newer) "Update available: v${it.latest}"
-                                    else "You're on the latest version (v${it.current})."
-                                },
+                                onSuccess = { if (it.newer) "Update available: v${it.latest}" else "You're on the latest version (v${it.current})." },
                                 onFailure = { e -> "Couldn't check: ${e.message}" }
                             )
                         }
@@ -230,20 +275,16 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
                 }
             }
 
+            // Permissions
             GhCard {
                 Text("Permissions", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    "Review every permission the app uses and grant the ones that are missing — one tap per permission.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
                 Button(onClick = { onNavigate(Routes.PERMISSIONS) }, modifier = Modifier.fillMaxWidth()) {
                     Text("Open permissions hub")
                 }
             }
 
+            // About
             GhCard {
                 Text("About", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
@@ -252,6 +293,7 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
                 }
             }
 
+            // Danger zone
             GhCard {
                 Text("Danger zone", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.height(8.dp))
@@ -263,36 +305,22 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
         }
     }
 
-    // ---- Export security-warning dialog ----
+    // Export warning dialog
     if (showExportWarning) {
         AlertDialog(
             onDismissRequest = { showExportWarning = false },
-            icon = {
-                Icon(
-                    Icons.Filled.Warning,
-                    null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(32.dp)
-                )
-            },
+            icon = { Icon(Icons.Filled.Warning, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(32.dp)) },
             title = { Text("Export includes live tokens") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "This backup file will contain all your GitHub Personal Access Tokens in plain text.",
-                        fontWeight = FontWeight.Medium
-                    )
+                    Text("This backup file will contain all your GitHub Personal Access Tokens in plain text.", fontWeight = FontWeight.Medium)
                     Text(
                         "• Keep the file encrypted or in a secure location.\n" +
                         "• Never share it or upload it to a public service.\n" +
                         "• Anyone with this file can access your GitHub accounts.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text(
-                        "When imported on another device, all accounts will be logged in automatically.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Text("When imported on another device, all accounts log in automatically.", style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = {
@@ -308,13 +336,11 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) { Text("I understand — Export") }
             },
-            dismissButton = {
-                TextButton(onClick = { showExportWarning = false }) { Text("Cancel") }
-            }
+            dismissButton = { TextButton(onClick = { showExportWarning = false }) { Text("Cancel") } }
         )
     }
 
-    // ---- Wipe dialog ----
+    // Wipe dialog
     if (wipeDialog) {
         com.githubcontrol.ui.components.ConfirmTypeDialog(
             title = "Wipe everything?",

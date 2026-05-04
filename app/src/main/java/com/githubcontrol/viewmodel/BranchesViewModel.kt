@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.githubcontrol.data.api.GhBranch
 import com.githubcontrol.data.repository.GitHubRepository
+import com.githubcontrol.service.BranchImportService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import javax.inject.Inject
@@ -20,49 +22,72 @@ data class BranchesState(
     val renaming: String? = null,
     val deleting: String? = null,
     val settingDefault: String? = null,
+    // Live import state mirrored from BranchImportService
     val importing: Boolean = false,
+    val importPaused: Boolean = false,
     val importProgress: String? = null,
+    val importResult: String? = null,
+    val importError: String? = null
 )
 
 @HiltViewModel
-class BranchesViewModel @Inject constructor(private val repo: GitHubRepository) : ViewModel() {
-    private val _state = MutableStateFlow(BranchesState())
-    val state: StateFlow<BranchesState> = _state
+class BranchesViewModel @Inject constructor(
+    private val repo: GitHubRepository,
+    val importService: BranchImportService
+) : ViewModel() {
+
+    private val _local = MutableStateFlow(BranchesState())
+    val state: StateFlow<BranchesState>
+
+    init {
+        // Combine local state with live import service state
+        val combined = MutableStateFlow(BranchesState())
+        viewModelScope.launch {
+            combine(_local, importService.state) { local, imp ->
+                local.copy(
+                    importing      = imp.active,
+                    importPaused   = imp.paused,
+                    importProgress = imp.progress,
+                    importResult   = imp.lastResult,
+                    importError    = imp.lastError
+                )
+            }.collect { combined.value = it }
+        }
+        state = combined
+    }
 
     fun clearMessages() {
-        _state.value = _state.value.copy(message = null, error = null)
+        _local.value = _local.value.copy(message = null, error = null)
+        importService.clearResult()
     }
 
     fun load(owner: String, name: String) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(loading = true, error = null)
+            _local.value = _local.value.copy(loading = true, error = null)
             try {
                 val items = repo.branches(owner, name)
-                val def = runCatching { repo.repo(owner, name).defaultBranch }.getOrNull().orEmpty()
-                _state.value = _state.value.copy(loading = false, items = items, defaultBranch = def)
+                val def   = runCatching { repo.repo(owner, name).defaultBranch }.getOrNull().orEmpty()
+                _local.value = _local.value.copy(loading = false, items = items, defaultBranch = def)
             } catch (t: Throwable) {
-                _state.value = _state.value.copy(loading = false, error = friendly(t, "load branches"))
+                _local.value = _local.value.copy(loading = false, error = friendly(t, "load branches"))
             }
         }
     }
 
     fun setDefault(owner: String, name: String, branch: String) {
-        if (branch == _state.value.defaultBranch) return
+        if (branch == _local.value.defaultBranch) return
         viewModelScope.launch {
-            _state.value = _state.value.copy(settingDefault = branch, error = null)
+            _local.value = _local.value.copy(settingDefault = branch, error = null)
             runCatching { repo.setDefaultBranch(owner, name, branch) }
                 .onSuccess { r ->
-                    _state.value = _state.value.copy(
+                    _local.value = _local.value.copy(
                         settingDefault = null,
-                        defaultBranch = r.defaultBranch,
-                        message = "Default branch set to '${r.defaultBranch}'",
+                        defaultBranch  = r.defaultBranch,
+                        message        = "Default branch set to '${r.defaultBranch}'"
                     )
                 }
                 .onFailure {
-                    _state.value = _state.value.copy(
-                        settingDefault = null,
-                        error = friendly(it, "set '$branch' as default"),
-                    )
+                    _local.value = _local.value.copy(settingDefault = null, error = friendly(it, "set '$branch' as default"))
                 }
         }
     }
@@ -70,39 +95,26 @@ class BranchesViewModel @Inject constructor(private val repo: GitHubRepository) 
     fun create(owner: String, name: String, newBranch: String, fromBranch: String) {
         viewModelScope.launch {
             runCatching { repo.createBranch(owner, name, newBranch, fromBranch) }
-                .onSuccess {
-                    _state.value = _state.value.copy(message = "Created $newBranch")
-                    load(owner, name)
-                }
-                .onFailure { _state.value = _state.value.copy(error = friendly(it, "create branch")) }
+                .onSuccess { _local.value = _local.value.copy(message = "Created $newBranch"); load(owner, name) }
+                .onFailure { _local.value = _local.value.copy(error = friendly(it, "create branch")) }
         }
     }
 
     fun delete(owner: String, name: String, branch: String) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(deleting = branch, error = null)
+            _local.value = _local.value.copy(deleting = branch, error = null)
             runCatching { repo.deleteBranch(owner, name, branch) }
-                .onSuccess {
-                    _state.value = _state.value.copy(deleting = null, message = "Deleted $branch")
-                    load(owner, name)
-                }
-                .onFailure {
-                    _state.value = _state.value.copy(deleting = null, error = friendly(it, "delete '$branch'"))
-                }
+                .onSuccess { _local.value = _local.value.copy(deleting = null, message = "Deleted $branch"); load(owner, name) }
+                .onFailure { _local.value = _local.value.copy(deleting = null, error = friendly(it, "delete '$branch'")) }
         }
     }
 
     fun rename(owner: String, name: String, oldBranch: String, newBranch: String) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(renaming = oldBranch, error = null, message = "Renaming '$oldBranch' → '$newBranch'…")
+            _local.value = _local.value.copy(renaming = oldBranch, error = null, message = "Renaming '$oldBranch' → '$newBranch'…")
             runCatching { repo.renameBranch(owner, name, oldBranch, newBranch) }
-                .onSuccess {
-                    _state.value = _state.value.copy(renaming = null, message = "Renamed '$oldBranch' → '$newBranch'")
-                    load(owner, name)
-                }
-                .onFailure {
-                    _state.value = _state.value.copy(renaming = null, message = null, error = friendly(it, "rename '$oldBranch'"))
-                }
+                .onSuccess { _local.value = _local.value.copy(renaming = null, message = "Renamed '$oldBranch' → '$newBranch'"); load(owner, name) }
+                .onFailure { _local.value = _local.value.copy(renaming = null, message = null, error = friendly(it, "rename '$oldBranch'")) }
         }
     }
 
@@ -127,6 +139,12 @@ class BranchesViewModel @Inject constructor(private val repo: GitHubRepository) 
         return Pair(owner, repo)
     }
 
+    /**
+     * Delegates the branch import to [BranchImportService] — a singleton whose coroutine
+     * scope is tied to the application, not to this ViewModel. The import continues even if
+     * the user navigates away from BranchesScreen. Network losses are automatically handled
+     * with a retry loop.
+     */
     fun importBranch(
         targetOwner: String,
         targetName: String,
@@ -136,40 +154,23 @@ class BranchesViewModel @Inject constructor(private val repo: GitHubRepository) 
     ) {
         val (srcOwner, srcRepo) = parseRepoUrl(sourceUrl)
             ?: run {
-                _state.value = _state.value.copy(
+                _local.value = _local.value.copy(
                     error = "Could not parse repo URL — use 'https://github.com/owner/repo' or 'owner/repo'"
                 )
                 return
             }
 
-        viewModelScope.launch {
-            _state.value = _state.value.copy(importing = true, importProgress = "Starting import…", error = null)
-            runCatching {
-                repo.importBranchFromRepo(
-                    sourceOwner  = srcOwner,
-                    sourceRepo   = srcRepo,
-                    sourceBranch = sourceBranch,
-                    targetOwner  = targetOwner,
-                    targetRepo   = targetName,
-                    newBranch    = newBranchName,
-                    onProgress   = { msg -> _state.value = _state.value.copy(importProgress = msg) }
-                )
-            }.onSuccess {
-                _state.value = _state.value.copy(
-                    importing = false,
-                    importProgress = null,
-                    message = "Branch '$newBranchName' imported from $srcOwner/$srcRepo"
-                )
-                load(targetOwner, targetName)
-            }.onFailure {
-                _state.value = _state.value.copy(
-                    importing = false,
-                    importProgress = null,
-                    error = friendly(it, "import branch")
-                )
-            }
-        }
+        importService.startImport(
+            sourceOwner  = srcOwner,
+            sourceRepo   = srcRepo,
+            sourceBranch = sourceBranch,
+            targetOwner  = targetOwner,
+            targetRepo   = targetName,
+            newBranch    = newBranchName
+        )
     }
+
+    fun cancelImport() = importService.cancel()
 
     private fun friendly(t: Throwable, action: String): String {
         if (t is HttpException) {
