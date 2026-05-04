@@ -130,6 +130,75 @@ class GitHubRepository @Inject constructor(
     suspend fun languages(owner: String, name: String) = withContext(Dispatchers.IO) { api.languages(owner, name) }
 
     // ---------- High-level branch helpers ----------
+
+    /**
+     * Copy every file from [sourceBranch] of [sourceOwner]/[sourceRepo] into a new orphan
+     * branch [newBranch] in [targetOwner]/[targetRepo].
+     *
+     * [onProgress] is called with a human-readable status string during the operation so the UI
+     * can show live feedback. The function is capped at 300 blobs to avoid runaway API usage.
+     */
+    suspend fun importBranchFromRepo(
+        sourceOwner: String,
+        sourceRepo: String,
+        sourceBranch: String,
+        targetOwner: String,
+        targetRepo: String,
+        newBranch: String,
+        onProgress: (String) -> Unit = {}
+    ): GhRef = withContext(Dispatchers.IO) {
+        // 1. Resolve the source branch → commit → tree
+        onProgress("Resolving source branch…")
+        val srcBranch = api.branch(sourceOwner, sourceRepo, sourceBranch)
+        val srcCommit = api.commitDetail(sourceOwner, sourceRepo, srcBranch.commit.sha)
+        val treeSha   = srcCommit.commit.tree.sha
+
+        // 2. Fetch the full recursive tree from the source repo
+        onProgress("Fetching file tree…")
+        val srcTree = api.gitTree(sourceOwner, sourceRepo, treeSha, recursive = 1)
+        val blobs = srcTree.tree.filter { it.type == "blob" }.take(300)
+
+        // 3. Re-upload each blob into the target repo
+        val nodes = mutableListOf<TreeNode>()
+        blobs.forEachIndexed { idx, entry ->
+            onProgress("Uploading file ${idx + 1} / ${blobs.size}: ${entry.path}")
+            val blob     = api.getBlob(sourceOwner, sourceRepo, entry.sha)
+            val newBlob  = api.createBlob(
+                targetOwner, targetRepo,
+                CreateBlobRequest(blob.content.replace("\n", ""), "base64")
+            )
+            nodes += TreeNode(
+                path  = entry.path,
+                mode  = entry.mode,
+                type  = "blob",
+                sha   = newBlob.sha
+            )
+        }
+
+        // 4. Create a new tree in the target repo (no base_tree = fresh root)
+        onProgress("Creating tree in target repo…")
+        val newTree = api.createTree(targetOwner, targetRepo, CreateTreeRequest(baseTree = null, tree = nodes))
+
+        // 5. Create an orphan commit (no parents)
+        onProgress("Creating commit…")
+        val now    = java.time.Instant.now().toString()
+        val author = GhCommitAuthor("GitHub Control", "noreply@github.com", now)
+        val commit = api.createCommit(
+            targetOwner, targetRepo,
+            CreateCommitRequest(
+                message  = "Import from $sourceOwner/$sourceRepo@$sourceBranch",
+                tree     = newTree.sha,
+                parents  = emptyList(),
+                author   = author,
+                committer = author
+            )
+        )
+
+        // 6. Create the branch ref pointing at the new commit
+        onProgress("Creating branch ref…")
+        api.createRef(targetOwner, targetRepo, CreateRefRequest("refs/heads/$newBranch", commit.sha))
+    }
+
     suspend fun createBranch(owner: String, name: String, newRef: String, fromBranch: String): GhRef {
         val src = api.branch(owner, name, fromBranch)
         return api.createRef(owner, name, CreateRefRequest("refs/heads/$newRef", src.commit.sha))

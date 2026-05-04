@@ -20,6 +20,8 @@ data class BranchesState(
     val renaming: String? = null,
     val deleting: String? = null,
     val settingDefault: String? = null,
+    val importing: Boolean = false,
+    val importProgress: String? = null,
 )
 
 @HiltViewModel
@@ -101,6 +103,71 @@ class BranchesViewModel @Inject constructor(private val repo: GitHubRepository) 
                 .onFailure {
                     _state.value = _state.value.copy(renaming = null, message = null, error = friendly(it, "rename '$oldBranch'"))
                 }
+        }
+    }
+
+    /**
+     * Parse a GitHub repo URL in any of these formats and return Pair(owner, repo):
+     *   https://github.com/owner/repo
+     *   https://github.com/owner/repo.git
+     *   github.com/owner/repo
+     *   owner/repo
+     */
+    fun parseRepoUrl(raw: String): Pair<String, String>? {
+        val cleaned = raw.trim()
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .removePrefix("github.com/")
+            .removeSuffix(".git")
+            .trim('/')
+        val parts = cleaned.split("/")
+        if (parts.size < 2) return null
+        val owner = parts[0].ifBlank { return null }
+        val repo  = parts[1].ifBlank { return null }
+        return Pair(owner, repo)
+    }
+
+    fun importBranch(
+        targetOwner: String,
+        targetName: String,
+        sourceUrl: String,
+        sourceBranch: String,
+        newBranchName: String
+    ) {
+        val (srcOwner, srcRepo) = parseRepoUrl(sourceUrl)
+            ?: run {
+                _state.value = _state.value.copy(
+                    error = "Could not parse repo URL — use 'https://github.com/owner/repo' or 'owner/repo'"
+                )
+                return
+            }
+
+        viewModelScope.launch {
+            _state.value = _state.value.copy(importing = true, importProgress = "Starting import…", error = null)
+            runCatching {
+                repo.importBranchFromRepo(
+                    sourceOwner  = srcOwner,
+                    sourceRepo   = srcRepo,
+                    sourceBranch = sourceBranch,
+                    targetOwner  = targetOwner,
+                    targetRepo   = targetName,
+                    newBranch    = newBranchName,
+                    onProgress   = { msg -> _state.value = _state.value.copy(importProgress = msg) }
+                )
+            }.onSuccess {
+                _state.value = _state.value.copy(
+                    importing = false,
+                    importProgress = null,
+                    message = "Branch '$newBranchName' imported from $srcOwner/$srcRepo"
+                )
+                load(targetOwner, targetName)
+            }.onFailure {
+                _state.value = _state.value.copy(
+                    importing = false,
+                    importProgress = null,
+                    error = friendly(it, "import branch")
+                )
+            }
         }
     }
 
