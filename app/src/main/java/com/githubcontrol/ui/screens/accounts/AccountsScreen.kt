@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -11,8 +12,11 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,7 +41,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun AccountsScreen(vm: MainViewModel, onBack: () -> Unit, onAdd: () -> Unit) {
     val s by vm.state.collectAsState()
-    var inspect by remember { mutableStateOf<Account?>(null) }
+    var inspect   by remember { mutableStateOf<Account?>(null) }
+    var showPatFor by remember { mutableStateOf<Account?>(null) }
 
     Scaffold(topBar = {
         TopAppBar(title = { Text("Accounts") },
@@ -50,38 +55,185 @@ fun AccountsScreen(vm: MainViewModel, onBack: () -> Unit, onAdd: () -> Unit) {
                     val isActive = acc.id == s.activeLogin
                     GhCard(onClick = { vm.switchAccount(acc.id) }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            AsyncImage(model = acc.avatarUrl, contentDescription = null, modifier = Modifier.size(48.dp).clip(CircleShape))
+                            AsyncImage(
+                                model = acc.avatarUrl,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp).clip(CircleShape)
+                            )
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(acc.name ?: acc.login, fontWeight = FontWeight.SemiBold)
                                 Text("@${acc.login}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (acc.scopes.isNotEmpty())
-                                    Text("${acc.scopes.size} scope(s) · ${acc.tokenType ?: "token"}",
+                                    Text(
+                                        "${acc.scopes.size} scope(s) · ${acc.tokenType ?: "token"}",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                             }
-                            if (isActive) GhBadge("Active", MaterialTheme.colorScheme.primary)
+                            if (isActive) {
+                                GhBadge("Active", MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(4.dp))
+                            }
+                            // PAT viewer icon
+                            IconButton(onClick = { showPatFor = acc }) {
+                                Icon(
+                                    Icons.Filled.Key,
+                                    contentDescription = "View PAT",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                         Spacer(Modifier.height(6.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            OutlinedButton(onClick = { inspect = acc }) { Icon(Icons.Filled.Info, null); Spacer(Modifier.width(4.dp)); Text("Inspect token") }
+                            OutlinedButton(onClick = { inspect = acc }) {
+                                Icon(Icons.Filled.Info, null)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Inspect token")
+                            }
                         }
                     }
                 }
                 item {
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(onClick = { vm.logoutActive() }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Filled.Logout, null); Spacer(Modifier.width(8.dp)); Text("Sign out current account")
+                        Icon(Icons.Filled.Logout, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Sign out current account")
                     }
                 }
             }
             EmbeddedTerminal(section = "Accounts")
         }
     }
+
     inspect?.let { acc ->
         TokenInspectorDialog(account = acc, vm = vm, onDismiss = { inspect = null })
     }
+
+    showPatFor?.let { acc ->
+        PatViewerDialog(account = acc, onDismiss = { showPatFor = null })
+    }
 }
+
+// ─── PAT viewer dialog ───────────────────────────────────────────────────────
+
+@Composable
+private fun PatViewerDialog(account: Account, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    var revealed by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(Icons.Filled.Key, null, tint = MaterialTheme.colorScheme.primary)
+        },
+        title = {
+            Column {
+                Text("Personal Access Token")
+                Text(
+                    "@${account.login}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Token type + expiry chips
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    GhBadge(account.tokenType ?: "classic", MaterialTheme.colorScheme.tertiary)
+                    account.tokenExpiry?.let { GhBadge("expires $it", MaterialTheme.colorScheme.error) }
+                }
+
+                // Token display card
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "Token",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                // Toggle visibility
+                                IconButton(
+                                    onClick = { revealed = !revealed },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        if (revealed) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                        contentDescription = if (revealed) "Hide token" else "Show token",
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                // Copy
+                                IconButton(
+                                    onClick = {
+                                        ShareUtils.copyToClipboard(ctx, account.token, "PAT copied")
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.ContentCopy,
+                                        contentDescription = "Copy PAT",
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+
+                        if (revealed) {
+                            SelectionContainer {
+                                Text(
+                                    account.token,
+                                    fontFamily = FontFamily.Monospace,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        } else {
+                            // Masked — show first 4 + dots + last 4
+                            val masked = if (account.token.length > 8)
+                                account.token.take(4) + "•".repeat(account.token.length - 8) + account.token.takeLast(4)
+                            else
+                                "•".repeat(account.token.length)
+                            Text(
+                                masked,
+                                fontFamily = FontFamily.Monospace,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    "Never share your token. Anyone who has it has full access to this GitHub account.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+// ─── Token inspector dialog (unchanged) ──────────────────────────────────────
 
 @Composable
 private fun TokenInspectorDialog(account: Account, vm: MainViewModel, onDismiss: () -> Unit) {
