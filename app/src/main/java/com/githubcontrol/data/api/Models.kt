@@ -1,5 +1,7 @@
 package com.githubcontrol.data.api
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -487,10 +489,12 @@ data class CreateBlobRequest(val content: String, val encoding: String = "base64
 data class CreateTreeRequest(@SerialName("base_tree") val baseTree: String? = null, val tree: List<TreeNode>)
 
 @Serializable
+@OptIn(ExperimentalSerializationApi::class)
 data class TreeNode(
     val path: String,
     val mode: String = "100644",
     val type: String = "blob",
+    @EncodeDefault(mode = EncodeDefault.Mode.ALWAYS)
     val sha: String? = null,
     val content: String? = null
 )
