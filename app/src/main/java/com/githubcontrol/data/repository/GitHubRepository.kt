@@ -334,7 +334,7 @@ class GitHubRepository @Inject constructor(
         files: List<Pair<String, ByteArray?>>,
         message: String,
         authorName: String? = null, authorEmail: String? = null
-    ): GhCommit = withContext(Dispatchers.IO) {
+    ): GhGitCommit = withContext(Dispatchers.IO) {
         val branchInfo   = api.branch(owner, name, branch)
         val parentSha    = branchInfo.commit.sha
         val parentCommit = api.commitDetail(owner, name, parentSha)
@@ -407,7 +407,10 @@ class GitHubRepository @Inject constructor(
         repoName: String,
         uri: Uri
     ): String = withContext(Dispatchers.IO) {
-        val token = accountManager.activeToken()
+        // NOTE: Do NOT add Authorization/Accept headers here manually.
+        // rawClient already has authInterceptor which adds all required headers
+        // (Authorization, Accept, X-GitHub-Api-Version, User-Agent).
+        // Adding them again causes duplicate headers that result in HTTP 401.
 
         val streamBody = object : RequestBody() {
             override fun contentType() = "application/json; charset=utf-8".toMediaType()
@@ -445,13 +448,11 @@ class GitHubRepository @Inject constructor(
             }
         }
 
+        // rawClient interceptors add Accept, X-GitHub-Api-Version, User-Agent, Authorization —
+        // do NOT add them again here or they will be duplicated and GitHub returns HTTP 401.
         val request = Request.Builder()
             .url("https://api.github.com/repos/$owner/$repoName/git/blobs")
             .post(streamBody)
-            .addHeader("Accept", "application/vnd.github+json")
-            .addHeader("X-GitHub-Api-Version", "2022-11-28")
-            .addHeader("User-Agent", "GitHubControl-Android")
-            .apply { if (!token.isNullOrBlank()) addHeader("Authorization", "Bearer $token") }
             .build()
 
         val response = client.rawClient.newCall(request).execute()
@@ -486,7 +487,7 @@ class GitHubRepository @Inject constructor(
         message: String,
         authorName: String? = null,
         authorEmail: String? = null
-    ): GhCommit = withContext(Dispatchers.IO) {
+    ): GhGitCommit = withContext(Dispatchers.IO) {
         val blobSha      = createBlobStreaming(owner, repoName, uri)
         val branchInfo   = api.branch(owner, repoName, branch)
         val parentSha    = branchInfo.commit.sha

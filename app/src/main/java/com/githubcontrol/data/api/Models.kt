@@ -485,6 +485,25 @@ data class GhBlob(
 @Serializable
 data class CreateBlobRequest(val content: String, val encoding: String = "base64")
 
+/**
+ * Response from POST /repos/{owner}/{repo}/git/commits.
+ *
+ * This endpoint returns author/committer as {name, email, date} — NOT the full
+ * GhUser shape ({login, id, avatar_url}).  Using GhCommit here causes a
+ * MissingFieldException ("login", "id", "avatar_url") at path $.author.
+ * This dedicated model uses GhCommitAuthor for those fields.
+ */
+@Serializable
+data class GhGitCommit(
+    val sha: String,
+    val url: String = "",
+    val message: String = "",
+    val author: GhCommitAuthor? = null,
+    val committer: GhCommitAuthor? = null,
+    val tree: GhTreeRef? = null,
+    val parents: List<GhCommitParent> = emptyList()
+)
+
 @Serializable
 data class CreateTreeRequest(@SerialName("base_tree") val baseTree: String? = null, val tree: List<TreeNode>)
 

@@ -157,7 +157,7 @@ interface GitHubApi {
     suspend fun createTree(@Path("owner") owner: String, @Path("repo") repo: String, @Body body: CreateTreeRequest): GhTreeRef
 
     @POST("repos/{owner}/{repo}/git/commits")
-    suspend fun createCommit(@Path("owner") owner: String, @Path("repo") repo: String, @Body body: CreateCommitRequest): GhCommit
+    suspend fun createCommit(@Path("owner") owner: String, @Path("repo") repo: String, @Body body: CreateCommitRequest): GhGitCommit
 
     @GET("repos/{owner}/{repo}/git/trees/{sha}")
     suspend fun gitTree(@Path("owner") owner: String, @Path("repo") repo: String, @Path("sha") sha: String, @Query("recursive") recursive: Int = 0): GhFileTree
