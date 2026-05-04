@@ -3,9 +3,14 @@ package com.githubcontrol.data.repository
 import com.githubcontrol.data.api.*
 import com.githubcontrol.data.auth.AccountManager
 import kotlinx.coroutines.Dispatchers
-import retrofit2.HttpException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -133,11 +138,16 @@ class GitHubRepository @Inject constructor(
     // ---------- High-level branch helpers ----------
 
     /**
-     * Copy every file from [sourceBranch] of [sourceOwner]/[sourceRepo] into a new orphan
-     * branch [newBranch] in [targetOwner]/[targetRepo].
+     * Import every commit from [sourceBranch] of [sourceOwner]/[sourceRepo] into a new branch
+     * [newBranch] in [targetOwner]/[targetRepo], preserving full commit history, original
+     * authors, dates, and messages.
      *
-     * [onProgress] is called with a human-readable status string during the operation so the UI
-     * can show live feedback. The function is capped at 300 blobs to avoid runaway API usage.
+     * Speed optimisations:
+     *  - Up to [BLOB_CONCURRENCY] blobs are fetched and uploaded in parallel.
+     *  - A deduplication cache ensures the same blob is never uploaded twice.
+     *  - Each commit only uploads the files that *changed* since the previous commit;
+     *    unchanged files are inherited via the Git Trees API baseTree mechanism.
+     *  - Capped at [MAX_COMMITS] to avoid rate-limit exhaustion on very large repos.
      */
     suspend fun importBranchFromRepo(
         sourceOwner: String,
@@ -148,61 +158,117 @@ class GitHubRepository @Inject constructor(
         newBranch: String,
         onProgress: (String) -> Unit = {}
     ): GhRef = withContext(Dispatchers.IO) {
-        // 1. Resolve the source branch → commit → tree
-        onProgress("Resolving source branch…")
-        val srcBranch = api.branch(sourceOwner, sourceRepo, sourceBranch)
-        val srcCommit = api.commitDetail(sourceOwner, sourceRepo, srcBranch.commit.sha)
-        val treeSha   = srcCommit.commit.tree.sha
 
-        // 2. Fetch the full recursive tree from the source repo
-        onProgress("Fetching file tree…")
-        val srcTree = api.gitTree(sourceOwner, sourceRepo, treeSha, recursive = 1)
-        val blobs = srcTree.tree.filter { it.type == "blob" }.take(300)
+        val MAX_COMMITS     = 200
+        val BLOB_CONCURRENCY = 8
+        val semaphore       = Semaphore(BLOB_CONCURRENCY)
+        // source blob SHA → target blob SHA  (avoids re-uploading identical content)
+        val blobCache       = mutableMapOf<String, String>()
 
-        // 3. Re-upload each blob into the target repo
-        val nodes = mutableListOf<TreeNode>()
-        blobs.forEachIndexed { idx, entry ->
-            onProgress("Uploading file ${idx + 1} / ${blobs.size}: ${entry.path}")
-            val blob     = api.getBlob(sourceOwner, sourceRepo, entry.sha)
-            val newBlob  = api.createBlob(
+        // ── 1. Collect all commits, oldest-first ─────────────────────────────
+        onProgress("Fetching commit history…")
+        val allCommits = mutableListOf<GhCommit>()
+        var page = 1
+        while (allCommits.size < MAX_COMMITS) {
+            val batch = api.commits(
+                sourceOwner, sourceRepo,
+                sha = sourceBranch, perPage = 100, page = page
+            )
+            if (batch.isEmpty()) break
+            allCommits.addAll(batch)
+            if (batch.size < 100) break
+            page++
+        }
+        if (allCommits.isEmpty()) error("No commits found on $sourceOwner/$sourceRepo@$sourceBranch")
+        allCommits.reverse()                                    // oldest → newest
+        val totalCommits = allCommits.size
+        onProgress("Found $totalCommits commit(s) — importing with full history…")
+
+        // ── 2. Replay commits one-by-one ─────────────────────────────────────
+        var prevSourceTree    = emptyMap<String, GhFileTreeItem>() // path → item
+        var prevTargetTreeSha: String? = null
+        var prevTargetCommitSha: String? = null
+
+        for ((idx, ghCommit) in allCommits.withIndex()) {
+            val shortMsg = ghCommit.commit.message.lines().first().take(72)
+            onProgress("Commit ${idx + 1}/$totalCommits: $shortMsg")
+
+            // Fetch the full recursive file tree for this commit
+            val srcTree = api.gitTree(
+                sourceOwner, sourceRepo,
+                ghCommit.commit.tree.sha, recursive = 1
+            )
+            val currentSourceTree = srcTree.tree
+                .filter { it.type == "blob" }
+                .associateBy { it.path }
+
+            // Determine what changed relative to previous commit
+            val changedEntries = currentSourceTree.values.filter { item ->
+                prevSourceTree[item.path]?.sha != item.sha
+            }
+            val deletedPaths = prevSourceTree.keys.filter { it !in currentSourceTree }
+
+            // Upload changed/added blobs in parallel (deduplicated)
+            val uploadedNodes: List<TreeNode> = coroutineScope {
+                changedEntries.map { item ->
+                    async {
+                        semaphore.withPermit {
+                            val targetSha = blobCache.getOrPut(item.sha) {
+                                val blob = api.getBlob(sourceOwner, sourceRepo, item.sha)
+                                api.createBlob(
+                                    targetOwner, targetRepo,
+                                    CreateBlobRequest(blob.content.replace("\n", ""), "base64")
+                                ).sha
+                            }
+                            TreeNode(path = item.path, mode = item.mode, type = "blob", sha = targetSha)
+                        }
+                    }
+                }.awaitAll()
+            }
+
+            // Deleted files → null SHA removes them from the inherited base tree
+            val deletionNodes = deletedPaths.map { path ->
+                TreeNode(path = path, mode = "100644", type = "blob", sha = null)
+            }
+
+            // Create target tree:
+            //   - First commit → no baseTree (fresh orphan tree)
+            //   - Subsequent  → baseTree inherits unchanged files, we only patch deltas
+            val allNodes = uploadedNodes + deletionNodes
+            val newTree = api.createTree(
                 targetOwner, targetRepo,
-                CreateBlobRequest(blob.content.replace("\n", ""), "base64")
+                CreateTreeRequest(baseTree = prevTargetTreeSha, tree = allNodes)
             )
-            nodes += TreeNode(
-                path  = entry.path,
-                mode  = entry.mode,
-                type  = "blob",
-                sha   = newBlob.sha
+
+            // Create commit preserving original author / committer / dates / message
+            val origAuthor    = ghCommit.commit.author
+            val origCommitter = ghCommit.commit.committer
+            val newCommit = api.createCommit(
+                targetOwner, targetRepo,
+                CreateCommitRequest(
+                    message   = ghCommit.commit.message,
+                    tree      = newTree.sha,
+                    parents   = listOfNotNull(prevTargetCommitSha),
+                    author    = GhCommitAuthor(origAuthor.name,    origAuthor.email,    origAuthor.date),
+                    committer = GhCommitAuthor(origCommitter.name, origCommitter.email, origCommitter.date)
+                )
             )
+
+            prevSourceTree      = currentSourceTree
+            prevTargetTreeSha   = newTree.sha
+            prevTargetCommitSha = newCommit.sha
         }
 
-        // 4. Create a new tree in the target repo (no base_tree = fresh root)
-        onProgress("Creating tree in target repo…")
-        val newTree = api.createTree(targetOwner, targetRepo, CreateTreeRequest(baseTree = null, tree = nodes))
-
-        // 5. Create an orphan commit (no parents)
-        onProgress("Creating commit…")
-        val now    = java.time.Instant.now().toString()
-        val author = GhCommitAuthor("GitHub Control", "noreply@github.com", now)
-        val commit = api.createCommit(
-            targetOwner, targetRepo,
-            CreateCommitRequest(
-                message  = "Import from $sourceOwner/$sourceRepo@$sourceBranch",
-                tree     = newTree.sha,
-                parents  = emptyList(),
-                author   = author,
-                committer = author
-            )
-        )
-
-        // 6. Create the branch ref pointing at the new commit (update if it already exists)
-        onProgress("Creating branch ref…")
-        runCatching { api.createRef(targetOwner, targetRepo, CreateRefRequest("refs/heads/$newBranch", commit.sha)) }
-            .getOrElse { e ->
-                if (e is HttpException && e.code() == 422)
-                    api.updateRef(targetOwner, targetRepo, "heads/$newBranch", UpdateRefRequest(sha = commit.sha, force = true))
-                else throw e
-            }
+        // ── 3. Point the branch ref at the final commit ───────────────────────
+        onProgress("Finalising branch ref…")
+        val headSha = prevTargetCommitSha ?: error("Import produced no commits")
+        runCatching {
+            api.createRef(targetOwner, targetRepo, CreateRefRequest("refs/heads/$newBranch", headSha))
+        }.getOrElse { e ->
+            if (e is HttpException && e.code() == 422)
+                api.updateRef(targetOwner, targetRepo, "heads/$newBranch", UpdateRefRequest(sha = headSha, force = true))
+            else throw e
+        }
     }
 
     suspend fun createBranch(owner: String, name: String, newRef: String, fromBranch: String): GhRef {
