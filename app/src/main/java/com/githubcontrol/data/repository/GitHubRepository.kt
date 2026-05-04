@@ -190,14 +190,10 @@ class GitHubRepository @Inject constructor(
                                 targetOwner, targetRepo,
                                 CreateBlobRequest(rawContent, "base64")
                             ).sha
-                            // Normalise mode to the subset GitHub's createTree API accepts.
-                            // Non-standard modes (100664, 100775, etc.) cause HTTP 422.
-                            val safeMode = when (item.mode) {
-                                "100755" -> "100755" // executable
-                                "120000" -> "120000" // symlink
-                                else     -> "100644" // regular file (default)
-                            }
-                            TreeNode(path = item.path, mode = safeMode, type = "blob", sha = newSha)
+                            // Always use "100644" — GitHub's createTree is strict about
+                            // valid modes and some source repos have unusual values
+                            // (100664, 100775, 120000, etc.) that cause HTTP 422.
+                            TreeNode(path = item.path, mode = "100644", type = "blob", sha = newSha)
                         }.getOrElse { err ->
                             val detail = if (err is HttpException)
                                 err.response()?.errorBody()?.string() ?: err.message()
@@ -316,7 +312,12 @@ class GitHubRepository @Inject constructor(
     // ---------- Tree-based multi-file commit (true Git engine via REST) ----------
     /**
      * Commit multiple file changes atomically using the Git Data API.
-     * Each entry: path -> bytes (null deletes).
+     * Each entry: path -> bytes (null = delete that path).
+     *
+     * Deletion strategy: fetch the full current tree, drop deleted paths, re-reference
+     * the remaining blobs with their real SHAs.  This avoids sha=null tree nodes
+     * entirely — GitHub's createTree rejects requests where both sha AND content are
+     * present (even as null).
      */
     suspend fun commitFiles(
         owner: String, name: String, branch: String,
@@ -324,22 +325,46 @@ class GitHubRepository @Inject constructor(
         message: String,
         authorName: String? = null, authorEmail: String? = null
     ): GhCommit = withContext(Dispatchers.IO) {
-        val branchInfo = api.branch(owner, name, branch)
-        val parentSha = branchInfo.commit.sha
+        val branchInfo   = api.branch(owner, name, branch)
+        val parentSha    = branchInfo.commit.sha
         val parentCommit = api.commitDetail(owner, name, parentSha)
-        val baseTreeSha = parentCommit.commit.tree.sha
+        val baseTreeSha  = parentCommit.commit.tree.sha
 
-        val nodes = mutableListOf<TreeNode>()
-        for ((path, bytes) in files) {
-            if (bytes == null) {
-                nodes += TreeNode(path = path, mode = "100644", type = "blob", sha = null)
-            } else {
-                val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-                val blob = api.createBlob(owner, name, CreateBlobRequest(b64, "base64"))
-                nodes += TreeNode(path = path, mode = "100644", type = "blob", sha = blob.sha)
-            }
+        val toDelete = files.filter { it.second == null }.map { it.first }.toSet()
+        val toUpsert = files.filter { it.second != null }
+
+        val treeNodes = mutableListOf<TreeNode>()
+
+        if (toDelete.isNotEmpty()) {
+            // Fetch the complete current tree so we can re-reference every surviving
+            // blob with its real SHA — no sha=null nodes are ever sent.
+            Logger.i("commitFiles", "Deletion mode: fetching full tree for $owner/$name@$branch")
+            val currentTree = api.gitTree(owner, name, baseTreeSha, recursive = 1)
+            currentTree.tree
+                .filter { it.type == "blob" && it.path !in toDelete }
+                .forEach { item ->
+                    treeNodes += TreeNode(path = item.path, mode = "100644", type = "blob", sha = item.sha)
+                }
+            Logger.i("commitFiles", "Keeping ${treeNodes.size} blobs, deleting ${toDelete.size}")
         }
-        val tree = api.createTree(owner, name, CreateTreeRequest(baseTree = baseTreeSha, tree = nodes))
+
+        // Upload new / modified blobs
+        for ((path, bytes) in toUpsert) {
+            val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+            val blob = api.createBlob(owner, name, CreateBlobRequest(b64, "base64"))
+            // Remove any stale entry for this path then add the new one
+            treeNodes.removeAll { it.path == path }
+            treeNodes += TreeNode(path = path, mode = "100644", type = "blob", sha = blob.sha)
+        }
+
+        // When there are deletions we send a COMPLETE tree (baseTree=null).
+        // When it is uploads-only we use baseTree to inherit unchanged files efficiently.
+        val treeReq = if (toDelete.isNotEmpty())
+            CreateTreeRequest(baseTree = null, tree = treeNodes)
+        else
+            CreateTreeRequest(baseTree = baseTreeSha, tree = treeNodes)
+
+        val tree = api.createTree(owner, name, treeReq)
 
         val author = if (authorName != null && authorEmail != null)
             GhCommitAuthor(authorName, authorEmail, java.time.Instant.now().toString())
@@ -349,8 +374,6 @@ class GitHubRepository @Inject constructor(
             message = message, tree = tree.sha, parents = listOf(parentSha),
             author = author, committer = author
         ))
-        // force=true avoids 422 if another commit landed on the branch between our
-        // parent-SHA read and this update (e.g., concurrent push or file API write).
         Logger.i("commitFiles", "Updating ref heads/$branch → ${commit.sha}")
         api.updateRef(owner, name, "heads/$branch", UpdateRefRequest(commit.sha, force = true))
         commit
