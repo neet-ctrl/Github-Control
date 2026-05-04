@@ -174,18 +174,32 @@ class GitHubRepository @Inject constructor(
             blobs.map { item ->
                 async {
                     semaphore.withPermit {
-                        val blob = api.getBlob(sourceOwner, sourceRepo, item.sha)
-                        val newSha = api.createBlob(
-                            targetOwner, targetRepo,
-                            CreateBlobRequest(blob.content.replace("\n", ""), "base64")
-                        ).sha
                         val done = uploaded.incrementAndGet()
                         val pct  = done.toFloat() / total
                         onProgress("Uploading files… ($done/$total)", 0.1f + pct * 0.8f)
-                        TreeNode(path = item.path, mode = item.mode, type = "blob", sha = newSha)
+                        runCatching {
+                            val blob = api.getBlob(sourceOwner, sourceRepo, item.sha)
+                            if (blob.encoding == "none") {
+                                // GitHub won't serve the content (file > 100 MB) — skip it
+                                Logger.w("Import", "Skipping ${item.path}: blob too large for API (encoding=none)")
+                                return@runCatching null
+                            }
+                            val rawContent = blob.content.replace("\n", "")
+                            val newSha = api.createBlob(
+                                targetOwner, targetRepo,
+                                CreateBlobRequest(rawContent, "base64")
+                            ).sha
+                            TreeNode(path = item.path, mode = item.mode, type = "blob", sha = newSha)
+                        }.getOrElse { err ->
+                            val detail = if (err is HttpException)
+                                err.response()?.errorBody()?.string() ?: err.message()
+                            else err.message
+                            Logger.e("Import", "Skipping ${item.path}: $detail", err)
+                            null
+                        }
                     }
                 }
-            }.awaitAll()
+            }.awaitAll().filterNotNull()
         }
 
         // ── 4. Create tree + single commit ───────────────────────────────────
@@ -327,7 +341,10 @@ class GitHubRepository @Inject constructor(
             message = message, tree = tree.sha, parents = listOf(parentSha),
             author = author, committer = author
         ))
-        api.updateRef(owner, name, "heads/$branch", UpdateRefRequest(commit.sha, false))
+        // force=true avoids 422 if another commit landed on the branch between our
+        // parent-SHA read and this update (e.g., concurrent push or file API write).
+        Logger.i("commitFiles", "Updating ref heads/$branch → ${commit.sha}")
+        api.updateRef(owner, name, "heads/$branch", UpdateRefRequest(commit.sha, force = true))
         commit
     }
 

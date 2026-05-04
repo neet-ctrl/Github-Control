@@ -63,9 +63,18 @@ class FilesViewModel @Inject constructor(private val repo: GitHubRepository) : V
         val s = _state.value
         viewModelScope.launch {
             try {
-                repo.api.deleteFile(s.owner, s.name, path, DeleteFileRequest(message, sha, s.ref.ifBlank { null }))
+                val branch = s.ref.ifBlank { null }
+                android.util.Log.d("FilesVM", "deleteFile path=$path sha=$sha branch=$branch")
+                repo.api.deleteFile(s.owner, s.name, path, DeleteFileRequest(message, sha, branch))
                 load(s.owner, s.name, s.path, s.ref); onDone()
-            } catch (t: Throwable) { _state.value = _state.value.copy(error = t.message) }
+            } catch (t: Throwable) {
+                val detail = if (t is retrofit2.HttpException)
+                    runCatching { t.response()?.errorBody()?.string() }.getOrNull()
+                        ?.takeIf { it.isNotBlank() } ?: "HTTP ${t.code()}"
+                else t.message
+                android.util.Log.e("FilesVM", "deleteFile failed: $detail", t)
+                _state.value = _state.value.copy(error = "Delete failed: $detail")
+            }
         }
     }
 
@@ -103,14 +112,21 @@ class FilesViewModel @Inject constructor(private val repo: GitHubRepository) : V
         if (selectedItems.isEmpty()) { onDone(); return }
         viewModelScope.launch {
             try {
-                // Expand any folders so directory selection wipes their full subtree
-                // in a single atomic Git Data API commit.
+                val branch = s.ref.ifBlank { "HEAD" }
                 val paths = expandPaths(s.owner, s.name, s.ref, selectedItems)
+                android.util.Log.d("FilesVM", "deleteSelected ${paths.size} paths on branch $branch")
                 val ops: List<Pair<String, ByteArray?>> = paths.map { it to null }
-                repo.commitFiles(s.owner, s.name, s.ref.ifBlank { "HEAD" }, ops, message, null, null)
+                repo.commitFiles(s.owner, s.name, branch, ops, message, null, null)
                 clearSelection()
                 load(s.owner, s.name, s.path, s.ref); onDone()
-            } catch (t: Throwable) { _state.value = _state.value.copy(error = t.message) }
+            } catch (t: Throwable) {
+                val detail = if (t is retrofit2.HttpException)
+                    runCatching { t.response()?.errorBody()?.string() }.getOrNull()
+                        ?.takeIf { it.isNotBlank() } ?: "HTTP ${t.code()}"
+                else t.message
+                android.util.Log.e("FilesVM", "deleteSelected failed: $detail", t)
+                _state.value = _state.value.copy(error = "Delete failed: $detail")
+            }
         }
     }
 
@@ -132,6 +148,7 @@ class FilesViewModel @Inject constructor(private val repo: GitHubRepository) : V
                 val toDelete = ft.tree
                     .filter { it.type == "blob" && it.path.startsWith(prefix) }
                     .map { it.path }
+                android.util.Log.d("FilesVM", "deleteFolder $folderPath: ${toDelete.size} blobs on branch $branchName")
                 if (toDelete.isEmpty()) {
                     _state.value = _state.value.copy(error = "Folder is empty or already deleted")
                     onDone(); return@launch
@@ -139,7 +156,14 @@ class FilesViewModel @Inject constructor(private val repo: GitHubRepository) : V
                 val ops: List<Pair<String, ByteArray?>> = toDelete.map { it to null }
                 repo.commitFiles(s.owner, s.name, branchName, ops, message, null, null)
                 load(s.owner, s.name, s.path, s.ref); onDone()
-            } catch (t: Throwable) { _state.value = _state.value.copy(error = t.message) }
+            } catch (t: Throwable) {
+                val detail = if (t is retrofit2.HttpException)
+                    runCatching { t.response()?.errorBody()?.string() }.getOrNull()
+                        ?.takeIf { it.isNotBlank() } ?: "HTTP ${t.code()}"
+                else t.message
+                android.util.Log.e("FilesVM", "deleteFolder failed: $detail", t)
+                _state.value = _state.value.copy(error = "Delete folder failed: $detail")
+            }
         }
     }
 

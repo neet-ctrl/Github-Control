@@ -148,9 +148,18 @@ class BranchImportService @Inject constructor(
                             // Brief pause before retry
                             delay(1000)
                         } else {
-                            Logger.e("BranchImport", "Non-retryable error: ${err?.message}", err)
+                            // Extract GitHub's detailed error body when available
+                            val httpBody = if (err is retrofit2.HttpException)
+                                runCatching { err.response()?.errorBody()?.string() }.getOrNull()
+                            else null
+                            val errMsg = when {
+                                httpBody != null -> "HTTP ${(err as retrofit2.HttpException).code()}: $httpBody"
+                                err?.message != null -> err.message!!
+                                else -> "unknown error"
+                            }
+                            Logger.e("BranchImport", "Non-retryable error (attempt $attempt): $errMsg", err)
                             _state.value = ImportState(
-                                lastError = "Import failed: ${err?.message ?: "unknown error"}"
+                                lastError = "Import failed: $errMsg"
                             )
                             return@launch
                         }
