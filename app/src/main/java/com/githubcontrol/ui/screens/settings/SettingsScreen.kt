@@ -1,6 +1,5 @@
 package com.githubcontrol.ui.screens.settings
 
-import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -9,10 +8,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.githubcontrol.ui.components.GhCard
 import com.githubcontrol.ui.navigation.Routes
@@ -34,6 +36,8 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
     var updateMessage by remember { mutableStateOf<String?>(null) }
     var checkingUpdates by remember { mutableStateOf(false) }
     var lastBackupJson by remember { mutableStateOf<String?>(null) }
+    var showExportWarning by remember { mutableStateOf(false) }
+    var importResult by remember { mutableStateOf<String?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -41,7 +45,7 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
         val text = lastBackupJson
         if (uri != null && text != null) {
             runCatching { SettingsBackup.writeToUri(ctx, uri, text) }
-                .onSuccess { Toast.makeText(ctx, "Backup saved", Toast.LENGTH_SHORT).show() }
+                .onSuccess { Toast.makeText(ctx, "Backup saved (contains your PATs — keep it safe!)", Toast.LENGTH_LONG).show() }
                 .onFailure { Toast.makeText(ctx, "Failed: ${it.message}", Toast.LENGTH_LONG).show() }
         }
         lastBackupJson = null
@@ -55,9 +59,16 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
                 runCatching {
                     val text = SettingsBackup.readFromUri(ctx, uri) ?: error("empty file")
                     val backup = SettingsBackup.decode(text)
-                    SettingsBackup.apply(main.accountManager, backup)
-                }.onSuccess {
-                    Toast.makeText(ctx, "Settings imported", Toast.LENGTH_SHORT).show()
+                    val added = SettingsBackup.apply(main.accountManager, backup)
+                    // Refresh auth state so newly added accounts appear immediately
+                    main.refresh()
+                    added
+                }.onSuccess { added ->
+                    importResult = if (added > 0)
+                        "Settings imported. $added account(s) logged in automatically."
+                    else
+                        "Settings imported. All accounts were already present — nothing new added."
+                    Toast.makeText(ctx, importResult, Toast.LENGTH_LONG).show()
                 }.onFailure {
                     Toast.makeText(ctx, "Import failed: ${it.message}", Toast.LENGTH_LONG).show()
                 }
@@ -147,22 +158,41 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
                 Text("Backup & restore", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Save your settings + account list (without tokens) to a JSON file you can move to a new device.",
+                    "Export saves all your settings AND your account PATs to a JSON file so a new device can log in automatically when you import.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(Modifier.height(4.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.Warning,
+                            null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "The exported file contains your live GitHub tokens. Store it securely and never share it.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(onClick = {
-                        scope.launch {
-                            val backup = SettingsBackup.snapshot(main.accountManager)
-                            lastBackupJson = SettingsBackup.encode(backup)
-                            exportLauncher.launch("github-control-backup.json")
-                        }
-                    }, modifier = Modifier.weight(1f)) { Text("Export") }
-                    OutlinedButton(onClick = {
-                        importLauncher.launch(arrayOf("application/json"))
-                    }, modifier = Modifier.weight(1f)) { Text("Import") }
+                    Button(
+                        onClick = { showExportWarning = true },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Export") }
+                    OutlinedButton(
+                        onClick = { importLauncher.launch(arrayOf("application/json")) },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Import") }
                 }
             }
 
@@ -232,6 +262,59 @@ fun SettingsScreen(main: MainViewModel, onBack: () -> Unit, onNavigate: (String)
             }
         }
     }
+
+    // ---- Export security-warning dialog ----
+    if (showExportWarning) {
+        AlertDialog(
+            onDismissRequest = { showExportWarning = false },
+            icon = {
+                Icon(
+                    Icons.Filled.Warning,
+                    null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = { Text("Export includes live tokens") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "This backup file will contain all your GitHub Personal Access Tokens in plain text.",
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        "• Keep the file encrypted or in a secure location.\n" +
+                        "• Never share it or upload it to a public service.\n" +
+                        "• Anyone with this file can access your GitHub accounts.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "When imported on another device, all accounts will be logged in automatically.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showExportWarning = false
+                        scope.launch {
+                            val backup = SettingsBackup.snapshot(main.accountManager)
+                            lastBackupJson = SettingsBackup.encode(backup)
+                            exportLauncher.launch("github-control-backup.json")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("I understand — Export") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExportWarning = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // ---- Wipe dialog ----
     if (wipeDialog) {
         com.githubcontrol.ui.components.ConfirmTypeDialog(
             title = "Wipe everything?",
