@@ -250,14 +250,15 @@ class UploadManager @Inject constructor(
                 Logger.i("Upload", "${if (isLargeFile) "Large file" else "OOM retry"}: streaming ${uf.targetPath} (${uf.sizeBytes}B) via Git Blobs API")
                 try {
                     repo.commitSingleLargeFile(
-                        owner       = job.owner,
-                        repoName    = job.repo,
-                        branch      = job.branch,
-                        targetPath  = finalPath,
-                        uri         = Uri.parse(uf.id),
-                        message     = job.message,
-                        authorName  = job.authorName,
-                        authorEmail = job.authorEmail
+                        owner         = job.owner,
+                        repoName      = job.repo,
+                        branch        = job.branch,
+                        targetPath    = finalPath,
+                        uri           = Uri.parse(uf.id),
+                        message       = job.message,
+                        fileSizeBytes = uf.sizeBytes,
+                        authorName    = job.authorName,
+                        authorEmail   = job.authorEmail
                     )
                     uf.state     = UploadFileState.DONE
                     uf.bytesDone = uf.sizeBytes
@@ -366,42 +367,121 @@ class UploadManager @Inject constructor(
     }
 
     /**
-     * Atomically replace the contents of [job.targetFolder]: deletes any existing
-     * files inside that folder that aren't being uploaded, then writes all of the
-     * new files in a single Git Data API commit.
+     * Replace folder contents: first delete every existing file in [job.targetFolder]
+     * one-by-one via the Contents API, then upload every new file one-by-one
+     * (streaming path for files ≥ 50 MB, Contents API for smaller files).
+     *
+     * This gives the user per-file progress feedback and supports large files that
+     * can't be loaded into memory for an atomic Git-data-API commit.
      */
     private suspend fun runReplaceFolder(job: UploadJob) {
-        // 1. List existing files under the target folder (recursively).
+        val LARGE_FILE_THRESHOLD = 50L * 1024 * 1024
         val targetFolder = job.targetFolder.trim('/')
-        val existing: List<String> = runCatching {
-            val branchInfo = repo.api.branch(job.owner, job.repo, job.branch)
-            val parent = repo.api.commitDetail(job.owner, job.repo, branchInfo.commit.sha)
-            val ft = repo.api.gitTree(job.owner, job.repo, parent.commit.tree.sha, recursive = 1)
-            ft.tree.filter { it.type == "blob" && (targetFolder.isEmpty() || it.path.startsWith("$targetFolder/")) }
-                .map { it.path }
-        }.getOrElse { emptyList() }
 
-        val newPaths = job.files.map { it.targetPath.trim('/') }.toSet()
-        val toDelete = existing.filterNot { it in newPaths }
+        // ── Phase 1: Discover existing files in the target folder ─────────────
+        _state.value = _state.value.copy(currentFile = "Scanning ${targetFolder.ifEmpty { "root" }}…")
+        Logger.i("Upload", "REPLACE_FOLDER scanning $targetFolder")
 
-        // 2. Build commitFiles list (deletes + adds). Use ByteArray? = null for deletes.
-        val ops = mutableListOf<Pair<String, ByteArray?>>()
-        for (path in toDelete) ops += path to null
+        val branchInfo   = repo.api.branch(job.owner, job.repo, job.branch)
+        val parentCommit = repo.api.commitDetail(job.owner, job.repo, branchInfo.commit.sha)
+        val ft           = repo.api.gitTree(job.owner, job.repo, parentCommit.commit.tree.sha, recursive = 1)
+        val existing     = ft.tree.filter { item ->
+            item.type == "blob" &&
+            (targetFolder.isEmpty() ||
+             item.path.startsWith("$targetFolder/") ||
+             item.path == targetFolder)
+        }
+        Logger.i("Upload", "REPLACE_FOLDER found ${existing.size} files to delete")
+
+        // ── Phase 2: Delete each existing file individually ───────────────────
+        val deleteMsg = job.message.ifBlank { "chore: clear ${targetFolder.ifEmpty { "root" }}" }
+        for (item in existing) {
+            if (cancelled) break
+            _state.value = _state.value.copy(
+                currentFile = "Deleting: ${item.path.substringAfterLast('/')}"
+            )
+            Logger.i("Upload", "REPLACE_FOLDER delete ${item.path}")
+            runCatching {
+                repo.api.deleteFile(
+                    job.owner, job.repo, item.path,
+                    com.githubcontrol.data.api.DeleteFileRequest(
+                        message = deleteMsg,
+                        sha     = item.sha,
+                        branch  = job.branch
+                    )
+                )
+            }.onFailure { t ->
+                Logger.w("Upload", "REPLACE_FOLDER delete failed ${item.path}: ${t.message}")
+            }
+        }
+        Logger.i("Upload", "REPLACE_FOLDER delete phase done (${existing.size} files)")
+
+        // ── Phase 3: Upload new files one by one ──────────────────────────────
+        val start = System.currentTimeMillis()
+        var bytesDone = 0L
+        var done      = 0
+
         for (uf in job.files) {
+            if (cancelled) break
+            uf.state = UploadFileState.UPLOADING
+            _state.value = _state.value.copy(currentFile = uf.displayName, files = job.files.toList())
+
+            val isLargeFile = uf.sizeBytes >= LARGE_FILE_THRESHOLD
             try {
-                val bytes = readUri(Uri.parse(uf.id)) ?: throw IllegalStateException("Cannot read")
-                ops += uf.targetPath to bytes
-                uf.state = UploadFileState.DONE
+                if (isLargeFile) {
+                    Logger.i("Upload", "REPLACE_FOLDER streaming ${uf.targetPath} (${uf.sizeBytes}B)")
+                    repo.commitSingleLargeFile(
+                        owner         = job.owner,
+                        repoName      = job.repo,
+                        branch        = job.branch,
+                        targetPath    = uf.targetPath,
+                        uri           = Uri.parse(uf.id),
+                        message       = job.message,
+                        fileSizeBytes = uf.sizeBytes,
+                        authorName    = job.authorName,
+                        authorEmail   = job.authorEmail
+                    )
+                } else {
+                    Logger.i("Upload", "REPLACE_FOLDER upload ${uf.targetPath} (${uf.sizeBytes}B)")
+                    val b64 = streamBase64(Uri.parse(uf.id), uf.sizeBytes)
+                        ?: throw IllegalStateException("Cannot read ${uf.targetPath}")
+                    val now    = java.time.Instant.now().toString()
+                    val author = if (job.authorName != null && job.authorEmail != null)
+                        com.githubcontrol.data.api.GhCommitAuthor(job.authorName, job.authorEmail, now)
+                        else null
+                    repo.api.putFile(
+                        job.owner, job.repo, uf.targetPath,
+                        PutFileRequest(
+                            message    = job.message,
+                            content    = b64,
+                            sha        = null,
+                            branch     = job.branch,
+                            author     = author,
+                            committer  = author
+                        )
+                    )
+                }
+                uf.state     = UploadFileState.DONE
                 uf.bytesDone = uf.sizeBytes
+                bytesDone   += uf.sizeBytes
+                Logger.i("Upload", "REPLACE_FOLDER OK ${uf.targetPath}")
             } catch (t: Throwable) {
                 uf.state = UploadFileState.FAILED
                 uf.error = t.message
-                Logger.e("Upload", "FAIL read ${uf.targetPath}", t)
+                Logger.e("Upload", "REPLACE_FOLDER FAIL ${uf.targetPath}", t)
             }
+
+            done++
+            notifier.upload(done, job.files.size, uf.displayName)
+            val elapsed = (System.currentTimeMillis() - start) / 1000.0
+            val rate    = if (elapsed > 0) bytesDone / elapsed else 0.0
+            val eta     = if (rate > 0) ((job.totalBytes - bytesDone) / rate).toLong() else 0
+            _state.value = _state.value.copy(
+                files = job.files.toList(), uploaded = done, bytesDone = bytesDone,
+                bytesPerSec = rate, etaSeconds = eta
+            )
         }
-        // 3. Single atomic commit.
-        repo.commitFiles(job.owner, job.repo, job.branch, ops, job.message, job.authorName, job.authorEmail)
-        Logger.i("Upload", "REPLACE_FOLDER committed: deleted=${toDelete.size} added=${job.files.size}")
+        Logger.i("Upload", "REPLACE_FOLDER done: deleted=${existing.size} uploaded=${done}")
     }
 
     private fun joinPath(base: String, name: String): String {

@@ -405,8 +405,19 @@ class GitHubRepository @Inject constructor(
     suspend fun createBlobStreaming(
         owner: String,
         repoName: String,
-        uri: Uri
+        uri: Uri,
+        fileSizeBytes: Long = -1
     ): String = withContext(Dispatchers.IO) {
+        // GitHub's API hard limit is 100 MB. Fail immediately with a clear message
+        // instead of uploading for 2+ minutes and receiving a cryptic 401/422.
+        val GITHUB_BLOB_MAX = 100L * 1024 * 1024
+        if (fileSizeBytes > 0 && fileSizeBytes > GITHUB_BLOB_MAX) {
+            throw IOException(
+                "File is ${fileSizeBytes / 1_048_576} MB — GitHub's API maximum is 100 MB. " +
+                "GitHub cannot accept files larger than 100 MB via any upload method."
+            )
+        }
+
         // NOTE: Do NOT add Authorization/Accept headers here manually.
         // rawClient already has authInterceptor which adds all required headers
         // (Authorization, Accept, X-GitHub-Api-Version, User-Agent).
@@ -414,6 +425,17 @@ class GitHubRepository @Inject constructor(
 
         val streamBody = object : RequestBody() {
             override fun contentType() = "application/json; charset=utf-8".toMediaType()
+
+            // Provide a known Content-Length so OkHttp sends a fixed-length request
+            // instead of chunked transfer encoding.  GitHub's blob API works reliably
+            // with Content-Length but may reject chunked uploads of large files.
+            // prefix = {"encoding":"base64","content":"  (28 chars)
+            // suffix = "}                                  ( 2 chars)
+            override fun contentLength(): Long {
+                if (fileSizeBytes <= 0) return -1
+                val base64Size = ((fileSizeBytes + 2) / 3) * 4
+                return 28L + base64Size + 2L
+            }
 
             override fun writeTo(sink: BufferedSink) {
                 sink.writeUtf8("{\"encoding\":\"base64\",\"content\":\"")
@@ -455,7 +477,12 @@ class GitHubRepository @Inject constructor(
             .post(streamBody)
             .build()
 
-        val response = client.rawClient.newCall(request).execute()
+        // Use a 10-minute write timeout: 120 s (the base client default) is too short
+        // for 50–100 MB files over a mobile connection.
+        val blobClient = client.rawClient.newBuilder()
+            .writeTimeout(600, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        val response = blobClient.newCall(request).execute()
         response.use { resp ->
             val bodyStr = resp.body?.string()
                 ?: throw IOException("Empty response from blob creation endpoint")
@@ -485,10 +512,11 @@ class GitHubRepository @Inject constructor(
         targetPath: String,
         uri: Uri,
         message: String,
+        fileSizeBytes: Long = -1,
         authorName: String? = null,
         authorEmail: String? = null
     ): GhGitCommit = withContext(Dispatchers.IO) {
-        val blobSha      = createBlobStreaming(owner, repoName, uri)
+        val blobSha      = createBlobStreaming(owner, repoName, uri, fileSizeBytes)
         val branchInfo   = api.branch(owner, repoName, branch)
         val parentSha    = branchInfo.commit.sha
         val parentCommit = api.commitDetail(owner, repoName, parentSha)

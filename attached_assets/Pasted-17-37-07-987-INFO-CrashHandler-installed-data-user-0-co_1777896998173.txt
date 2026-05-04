@@ -1,0 +1,272 @@
+17:37:07.987  INFO  [CrashHandler      ] installed → /data/user/0/com.githubcontrol/files/crashes
+17:37:07.989  INFO  [WidgetCtl         ] started — observing upload state
+17:37:07.989  INFO  [App               ] GitHub Control starting v1.0.0
+17:37:11.120  NET   [HTTP              ] → GET /user
+17:37:11.877  NET   [HTTP              ] ← 200 GET /user  757ms  rl=4912
+17:37:11.886  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+17:37:12.368  NET   [HTTP              ] ← 200 GET /user/repos  482ms  rl=4911
+17:37:12.388  NET   [HTTP              ] → GET /rate_limit
+17:37:12.817  NET   [HTTP              ] ← 200 GET /rate_limit  429ms  rl=4002
+17:37:12.826  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+17:37:13.389  NET   [HTTP              ] ← 200 GET /notifications  563ms  rl=4910
+17:37:14.258  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:37:14.728  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  470ms  rl=4001
+17:37:14.740  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testingq
+17:37:15.101  NET   [HTTP              ] ← 204 GET /user/starred/kumaritkahs-max/testingq  361ms  rl=4000
+17:37:15.107  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:37:15.605  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  498ms  rl=4909
+17:37:15.611  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contributors?per_page=30
+17:37:16.024  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contributors  413ms  rl=4908
+17:37:16.040  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/languages
+17:37:16.423  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/languages  383ms  rl=4907
+17:37:21.766  DEBUG [BranchImport      ] Network available
+17:37:21.783  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:37:22.190  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  407ms  rl=4906
+17:37:22.195  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:37:22.643  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  448ms  rl=3999
+17:37:23.691  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:37:24.468  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  777ms  rl=3998
+17:37:24.473  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testingq
+17:37:24.807  NET   [HTTP              ] ← 204 GET /user/starred/kumaritkahs-max/testingq  334ms  rl=3997
+17:37:24.817  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:37:24.951  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents?ref=Abc
+17:37:25.262  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  445ms  rl=4905
+17:37:25.272  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contributors?per_page=30
+17:37:25.308  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents  357ms  rl=3996
+17:37:25.371  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:37:25.674  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contributors  403ms  rl=4904
+17:37:25.685  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/languages
+17:37:25.811  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  439ms  rl=4903
+17:37:26.118  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/languages  433ms  rl=4902
+17:37:28.386  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents/gradle?ref=Abc
+17:37:28.755  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents/gradle  369ms  rl=3995
+17:37:28.769  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:37:29.304  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  535ms  rl=4901
+17:37:30.132  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents/gradle/wrapper?ref=Abc
+17:37:30.524  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents/gradle/wrapper  392ms  rl=3994
+17:37:30.537  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:37:30.959  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  422ms  rl=4900
+17:37:31.752  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents/gradle?ref=Abc
+17:37:32.098  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents/gradle  346ms  rl=3993
+17:37:32.211  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents?ref=Abc
+17:37:32.665  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents  454ms  rl=3992
+17:37:33.207  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:37:33.630  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  423ms  rl=3991
+17:37:33.640  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testingq
+17:37:33.977  NET   [HTTP              ] ← 204 GET /user/starred/kumaritkahs-max/testingq  337ms  rl=3990
+17:37:33.984  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:37:34.381  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  397ms  rl=4899
+17:37:34.388  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contributors?per_page=30
+17:37:34.779  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contributors  391ms  rl=4898
+17:37:34.784  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/languages
+17:37:35.183  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/languages  399ms  rl=4897
+17:37:41.781  NET   [HTTP              ] → GET /user
+17:37:42.177  NET   [HTTP              ] ← 200 GET /user  396ms  rl=4896
+17:37:42.189  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+17:37:42.617  NET   [HTTP              ] ← 200 GET /user/repos  428ms  rl=4895
+17:37:42.631  NET   [HTTP              ] → GET /rate_limit
+17:37:43.304  NET   [HTTP              ] ← 200 GET /rate_limit  673ms  rl=3990
+17:37:43.317  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+17:37:43.716  NET   [HTTP              ] ← 200 GET /notifications  399ms  rl=4894
+17:37:45.848  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:37:46.610  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  762ms  rl=3989
+17:37:46.627  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testingq
+17:37:46.960  NET   [HTTP              ] ← 204 GET /user/starred/kumaritkahs-max/testingq  333ms  rl=3988
+17:37:46.973  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:37:47.394  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  421ms  rl=4893
+17:37:47.412  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contributors?per_page=30
+17:37:47.868  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contributors  456ms  rl=4892
+17:37:47.878  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/languages
+17:37:48.344  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/languages  466ms  rl=4891
+17:37:49.373  NET   [HTTP              ] → GET /user
+17:37:49.774  NET   [HTTP              ] ← 200 GET /user  401ms  rl=4890
+17:37:49.789  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+17:37:50.227  NET   [HTTP              ] ← 200 GET /user/repos  438ms  rl=4889
+17:37:50.240  NET   [HTTP              ] → GET /rate_limit
+17:37:50.594  NET   [HTTP              ] ← 200 GET /rate_limit  354ms  rl=3988
+17:37:50.599  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+17:37:51.071  NET   [HTTP              ] ← 200 GET /notifications  472ms  rl=4888
+17:37:52.604  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:37:53.040  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  436ms  rl=3987
+17:37:53.049  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testingq
+17:37:53.409  NET   [HTTP              ] ← 204 GET /user/starred/kumaritkahs-max/testingq  360ms  rl=3986
+17:37:53.420  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:37:53.860  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  440ms  rl=4887
+17:37:53.877  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contributors?per_page=30
+17:37:54.260  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contributors  382ms  rl=4886
+17:37:54.268  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/languages
+17:37:54.628  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/languages  360ms  rl=4885
+17:37:56.190  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:37:56.665  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  474ms  rl=4884
+17:37:56.669  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:37:57.148  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  479ms  rl=3985
+17:38:00.789  NET   [HTTP              ] → DELETE /repos/kumaritkahs-max/testingq/git/refs/heads/main
+17:38:01.468  NET   [HTTP              ] ← 204 DELETE /repos/kumaritkahs-max/testingq/git/refs/heads/main  679ms  rl=3984
+17:38:01.481  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:38:01.970  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  489ms  rl=4883
+17:38:01.980  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:38:02.417  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  437ms  rl=3983
+17:38:08.159  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:38:08.667  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  508ms  rl=3982
+17:38:08.677  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testingq
+17:38:09.009  NET   [HTTP              ] ← 204 GET /user/starred/kumaritkahs-max/testingq  332ms  rl=3981
+17:38:09.022  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:38:09.476  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents?ref=Abc
+17:38:09.489  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  466ms  rl=4882
+17:38:09.495  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contributors?per_page=30
+17:38:09.945  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents  469ms  rl=3980
+17:38:09.958  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:38:10.026  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contributors  531ms  rl=4881
+17:38:10.030  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/languages
+17:38:10.376  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  418ms  rl=4880
+17:38:10.438  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/languages  408ms  rl=4879
+17:38:12.867  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents?ref=Hello3
+17:38:13.219  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents  351ms  rl=3979
+17:38:14.628  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents/testing?ref=Hello3
+17:38:14.997  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents/testing  370ms  rl=3978
+17:38:15.007  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:38:15.446  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  438ms  rl=4878
+17:38:16.749  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents/testing/Health?ref=Hello3
+17:38:17.148  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents/testing/Health  399ms  rl=3977
+17:38:17.166  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:38:20.763  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  3596ms  rl=4877
+17:38:24.888  NET   [HTTP              ] → DELETE /repos/kumaritkahs-max/testingq/contents/testing/Health/castecertificate.pdf
+17:38:25.634  NET   [HTTP              ] ← 200 DELETE /repos/kumaritkahs-max/testingq/contents/testing/Health/castecertificate.pdf  746ms  rl=3976
+17:38:25.642  NET   [HTTP              ] → DELETE /repos/kumaritkahs-max/testingq/contents/testing/Health/Complete%20blood%20count.pdf
+17:38:26.411  NET   [HTTP              ] ← 200 DELETE /repos/kumaritkahs-max/testingq/contents/testing/Health/Complete%20blood%20count.pdf  769ms  rl=3975
+17:38:26.415  NET   [HTTP              ] → DELETE /repos/kumaritkahs-max/testingq/contents/testing/Health/ESR%20level.pdf
+17:38:27.171  NET   [HTTP              ] ← 200 DELETE /repos/kumaritkahs-max/testingq/contents/testing/Health/ESR%20level.pdf  756ms  rl=3974
+17:38:27.175  NET   [HTTP              ] → DELETE /repos/kumaritkahs-max/testingq/contents/testing/Health/Grandmother_Medical_Explanation.pdf
+17:38:27.889  NET   [HTTP              ] ← 200 DELETE /repos/kumaritkahs-max/testingq/contents/testing/Health/Grandmother_Medical_Explanation.pdf  714ms  rl=3973
+17:38:27.893  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents/testing/Health?ref=Hello3
+17:38:28.272  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents/testing/Health  379ms  rl=3972
+17:38:29.491  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents/testing?ref=Hello3
+17:38:29.866  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents/testing  375ms  rl=3971
+17:38:29.918  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents?ref=Abc
+17:38:30.282  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents  363ms  rl=3970
+17:38:30.712  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:38:31.225  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  513ms  rl=3969
+17:38:31.231  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testingq
+17:38:31.886  NET   [HTTP              ] ← 204 GET /user/starred/kumaritkahs-max/testingq  655ms  rl=3968
+17:38:31.891  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:38:32.343  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  452ms  rl=4876
+17:38:32.350  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contributors?per_page=30
+17:38:32.732  NET   [HTTP              ] → GET /user
+17:38:32.783  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contributors  433ms  rl=4875
+17:38:32.787  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/languages
+17:38:33.122  NET   [HTTP              ] ← 200 GET /user  390ms  rl=4874
+17:38:33.135  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+17:38:33.185  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/languages  398ms  rl=4873
+17:38:33.952  NET   [HTTP              ] ← 200 GET /user/repos  817ms  rl=4872
+17:38:33.959  NET   [HTTP              ] → GET /rate_limit
+17:38:34.268  NET   [HTTP              ] ← 200 GET /rate_limit  309ms  rl=3968
+17:38:34.278  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+17:38:35.023  NET   [HTTP              ] ← 200 GET /notifications  745ms  rl=4871
+17:38:58.655  NET   [HTTP              ] → GET /user
+17:38:59.055  NET   [HTTP              ] ← 200 GET /user  401ms  rl=4870
+17:38:59.063  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+17:38:59.457  NET   [HTTP              ] ← 200 GET /user/repos  394ms  rl=4869
+17:38:59.469  NET   [HTTP              ] → GET /rate_limit
+17:38:59.788  NET   [HTTP              ] ← 200 GET /rate_limit  318ms  rl=3968
+17:38:59.793  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+17:39:00.212  NET   [HTTP              ] ← 200 GET /notifications  419ms  rl=4868
+17:39:01.037  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:39:01.438  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  401ms  rl=3967
+17:39:01.445  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testingq
+17:39:01.808  NET   [HTTP              ] ← 204 GET /user/starred/kumaritkahs-max/testingq  363ms  rl=3966
+17:39:01.816  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:39:02.228  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  412ms  rl=4867
+17:39:02.237  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contributors?per_page=30
+17:39:02.642  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contributors  405ms  rl=4866
+17:39:02.652  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/languages
+17:39:03.028  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/languages  376ms  rl=4865
+17:39:05.485  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents?ref=Abc
+17:39:05.845  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents  359ms  rl=3965
+17:39:05.869  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:39:06.267  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  398ms  rl=4864
+17:39:08.536  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents?ref=Hello3
+17:39:08.931  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents  394ms  rl=3964
+17:39:10.715  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents/testing?ref=Hello3
+17:39:11.068  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents/testing  353ms  rl=3963
+17:39:11.079  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:39:11.550  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  471ms  rl=4863
+17:39:12.422  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:39:12.849  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  427ms  rl=4862
+17:39:12.870  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents/.gitignore?ref=Hello3
+17:39:13.268  NET   [HTTP              ] ← 404 GET /repos/kumaritkahs-max/testingq/contents/.gitignore  398ms  rl=3962
+17:40:18.788  INFO  [Upload            ] start kumaritkahs-max/testingq@Hello3 files=1 bytes=107381870 mode=OVERWRITE
+17:40:18.823  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents/testing/NativeAlpha-standard-universal-release-v1.5.2%20(1).apk?ref=Hello3
+17:40:20.022  NET   [HTTP              ] ← 404 GET /repos/kumaritkahs-max/testingq/contents/testing/NativeAlpha-standard-universal-release-v1.5.2%20(1).apk  1199ms  rl=3961
+17:40:20.025  INFO  [Upload            ] Large file: streaming testing/NativeAlpha-standard-universal-release-v1.5.2 (1).apk (107381870B) via Git Blobs API
+17:40:20.038  NET   [HTTP              ] → POST /repos/kumaritkahs-max/testingq/git/blobs
+17:42:35.905  NET   [HTTP              ] ← 401 POST /repos/kumaritkahs-max/testingq/git/blobs  135867ms  rl=3960
+17:42:35.908  ERROR [Upload            ] FAIL (streaming) testing/NativeAlpha-standard-universal-release-v1.5.2 (1).apk :: IOException: Create blob failed (HTTP 401): {"message":"Bad credentials","documentation_url":"https://docs.github.com/rest","status":"401"}
+17:42:35.948  INFO  [Upload            ] done ok=false done=1 failed=1 skipped=0
+17:44:30.237  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents/testing?ref=Hello3
+17:44:30.820  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents?ref=Abc
+17:44:30.991  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents/testing  754ms  rl=3959
+17:44:31.233  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents  413ms  rl=3958
+17:44:31.949  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:44:32.383  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  433ms  rl=3957
+17:44:32.404  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testingq
+17:44:32.767  NET   [HTTP              ] ← 204 GET /user/starred/kumaritkahs-max/testingq  363ms  rl=3956
+17:44:32.784  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:44:32.835  NET   [HTTP              ] → GET /user
+17:44:33.213  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  429ms  rl=4861
+17:44:33.231  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contributors?per_page=30
+17:44:33.299  NET   [HTTP              ] ← 200 GET /user  464ms  rl=4860
+17:44:33.313  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+17:44:33.525  ERROR [HTTP              ] ✕ GET /repos/kumaritkahs-max/testingq/contributors :: IOException: Canceled
+17:44:33.729  NET   [HTTP              ] ← 200 GET /user/repos  416ms  rl=4858
+17:44:33.747  NET   [HTTP              ] → GET /rate_limit
+17:44:34.088  NET   [HTTP              ] ← 200 GET /rate_limit  341ms  rl=3956
+17:44:34.102  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+17:44:34.525  NET   [HTTP              ] ← 200 GET /notifications  423ms  rl=4857
+17:44:35.998  NET   [HTTP              ] → GET /user
+17:44:36.387  NET   [HTTP              ] ← 200 GET /user  389ms  rl=4999
+17:44:36.400  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+17:44:36.891  NET   [HTTP              ] ← 200 GET /user/repos  491ms  rl=4998
+17:44:36.899  NET   [HTTP              ] → GET /rate_limit
+17:44:37.459  NET   [HTTP              ] ← 200 GET /rate_limit  560ms  rl=5000
+17:44:37.479  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+17:44:37.879  NET   [HTTP              ] ← 200 GET /notifications  400ms  rl=4997
+17:44:40.065  NET   [HTTP              ] → GET /user
+17:44:40.569  NET   [HTTP              ] ← 200 GET /user  504ms  rl=4856
+17:44:40.583  NET   [HTTP              ] → GET /user/repos?affiliation=owner,collaborator,organization_member&sort=updated&direction=desc&per_page=8&page=1
+17:44:41.031  NET   [HTTP              ] ← 200 GET /user/repos  448ms  rl=4855
+17:44:41.041  NET   [HTTP              ] → GET /rate_limit
+17:44:41.366  NET   [HTTP              ] ← 200 GET /rate_limit  325ms  rl=3956
+17:44:41.377  NET   [HTTP              ] → GET /notifications?all=false&per_page=50
+17:44:41.785  NET   [HTTP              ] ← 200 GET /notifications  408ms  rl=4854
+17:44:44.096  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:44:44.537  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  441ms  rl=3955
+17:44:44.543  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testingq
+17:44:45.052  NET   [HTTP              ] ← 204 GET /user/starred/kumaritkahs-max/testingq  509ms  rl=3954
+17:44:45.062  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:44:45.490  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  428ms  rl=4853
+17:44:45.496  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contributors?per_page=30
+17:44:45.920  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contributors  424ms  rl=4852
+17:44:45.924  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/languages
+17:44:46.329  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/languages  405ms  rl=4851
+17:44:59.075  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:44:59.499  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  424ms  rl=4850
+17:44:59.507  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:44:59.939  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  432ms  rl=3953
+17:45:03.682  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq
+17:45:04.247  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq  566ms  rl=3952
+17:45:04.261  NET   [HTTP              ] → GET /user/starred/kumaritkahs-max/testingq
+17:45:04.628  NET   [HTTP              ] ← 204 GET /user/starred/kumaritkahs-max/testingq  367ms  rl=3951
+17:45:04.633  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:45:05.026  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  393ms  rl=4849
+17:45:05.030  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contributors?per_page=30
+17:45:05.427  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contributors  397ms  rl=4848
+17:45:05.431  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/languages
+17:45:05.861  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/languages  430ms  rl=4847
+17:46:20.267  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents?ref=Abc
+17:46:21.014  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents  746ms  rl=3950
+17:46:21.123  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:46:21.554  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  431ms  rl=4846
+17:46:22.184  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/branches?per_page=100
+17:46:23.124  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/branches  940ms  rl=4845
+17:46:23.134  NET   [HTTP              ] → GET /repos/kumaritkahs-max/testingq/contents/.gitignore?ref=Abc
+17:46:23.505  NET   [HTTP              ] ← 200 GET /repos/kumaritkahs-max/testingq/contents/.gitignore  371ms  rl=3949
