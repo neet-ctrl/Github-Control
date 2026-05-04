@@ -57,6 +57,7 @@ class AccountManager @Inject constructor(
     private val keyAppLockEnabled  = booleanPreferencesKey("app_lock_enabled")
     private val keyAppLockMethod   = stringPreferencesKey("app_lock_method")
     private val keyAppLockHash     = stringPreferencesKey("app_lock_hash")
+    private val keySecurityAnswer  = stringPreferencesKey("security_answer")
     // Cache
     private val keyAutoClearCache  = booleanPreferencesKey("auto_clear_cache")
     private val keyLastCacheCleared = longPreferencesKey("last_cache_cleared")
@@ -85,6 +86,7 @@ class AccountManager @Inject constructor(
     // App Lock flows
     val appLockEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[keyAppLockEnabled] ?: false }
     val appLockMethodFlow: Flow<String>   = context.dataStore.data.map { it[keyAppLockMethod] ?: "pin" }
+    val securityAnswerFlow: Flow<String>  = context.dataStore.data.map { it[keySecurityAnswer] ?: "Nitish Kumar" }
     // Cache flows
     val autoClearCacheFlow: Flow<Boolean> = context.dataStore.data.map { it[keyAutoClearCache] ?: false }
 
@@ -175,6 +177,8 @@ class AccountManager @Inject constructor(
     }
 
     suspend fun getAppLockHash(): String? = context.dataStore.data.first()[keyAppLockHash]
+    suspend fun setSecurityAnswer(answer: String) = context.dataStore.edit { it[keySecurityAnswer] = answer }
+    suspend fun getSecurityAnswer(): String = context.dataStore.data.first()[keySecurityAnswer] ?: "Nitish Kumar"
 
     // ── Cache ──────────────────────────────────────────────────────────────────
     suspend fun setAutoClearCache(enabled: Boolean) = context.dataStore.edit { it[keyAutoClearCache] = enabled }

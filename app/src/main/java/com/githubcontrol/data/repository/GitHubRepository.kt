@@ -3,6 +3,7 @@ package com.githubcontrol.data.repository
 import com.githubcontrol.data.api.*
 import com.githubcontrol.data.auth.AccountManager
 import kotlinx.coroutines.Dispatchers
+import retrofit2.HttpException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -194,9 +195,14 @@ class GitHubRepository @Inject constructor(
             )
         )
 
-        // 6. Create the branch ref pointing at the new commit
+        // 6. Create the branch ref pointing at the new commit (update if it already exists)
         onProgress("Creating branch ref…")
-        api.createRef(targetOwner, targetRepo, CreateRefRequest("refs/heads/$newBranch", commit.sha))
+        runCatching { api.createRef(targetOwner, targetRepo, CreateRefRequest("refs/heads/$newBranch", commit.sha)) }
+            .getOrElse { e ->
+                if (e is HttpException && e.code() == 422)
+                    api.updateRef(targetOwner, targetRepo, "heads/$newBranch", UpdateRefRequest(sha = commit.sha, force = true))
+                else throw e
+            }
     }
 
     suspend fun createBranch(owner: String, name: String, newRef: String, fromBranch: String): GhRef {

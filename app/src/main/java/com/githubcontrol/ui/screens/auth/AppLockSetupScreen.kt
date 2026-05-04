@@ -54,6 +54,10 @@ fun AppLockSetupScreen(
     var secondInput by remember { mutableStateOf("") }
     var errorMsg    by remember { mutableStateOf<String?>(null) }
 
+    var secAnswerDialog  by remember { mutableStateOf(false) }
+    var secAnswerInput   by remember { mutableStateOf("") }
+    val currentSecAnswer by am.securityAnswerFlow.collectAsState(initial = "Nitish Kumar")
+
     // PIN pad state
     var pin         by remember { mutableStateOf("") }
 
@@ -127,6 +131,35 @@ fun AppLockSetupScreen(
                             description = "Draw a pattern connecting at least 4 dots.",
                             onClick = { method = LockMethod.PATTERN; step = SetupStep.ENTER; firstInput = ""; enterReset++; errorMsg = null }
                         )
+
+                        if (appLockEnabled) {
+                            HorizontalDivider()
+                            Text("Recovery Question:", style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Card(
+                                onClick = { secAnswerInput = currentSecAnswer; secAnswerDialog = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        Modifier
+                                            .size(48.dp)
+                                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                                            .background(MaterialTheme.colorScheme.primaryContainer),
+                                        contentAlignment = Alignment.Center
+                                    ) { Icon(Icons.Filled.Info, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp)) }
+                                    Spacer(Modifier.width(14.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text("Tell Your Best Friend Name", fontWeight = FontWeight.SemiBold,
+                                            style = MaterialTheme.typography.titleMedium)
+                                        Text("Answer: $currentSecAnswer", style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -333,6 +366,42 @@ fun AppLockSetupScreen(
                 }
             }
         }
+    }
+
+    // Security answer dialog
+    if (secAnswerDialog) {
+        AlertDialog(
+            onDismissRequest = { secAnswerDialog = false },
+            icon = { Icon(Icons.Filled.Info, null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Change Recovery Answer") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Question: Tell Your Best Friend Name",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedTextField(
+                        value = secAnswerInput,
+                        onValueChange = { secAnswerInput = it },
+                        label = { Text("Answer") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val trimmed = secAnswerInput.trim()
+                        if (trimmed.isNotEmpty()) {
+                            scope.launch { am.setSecurityAnswer(trimmed) }
+                            secAnswerDialog = false
+                        }
+                    },
+                    enabled = secAnswerInput.isNotBlank()
+                ) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { secAnswerDialog = false }) { Text("Cancel") } }
+        )
     }
 }
 

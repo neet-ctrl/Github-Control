@@ -45,7 +45,9 @@ fun AppLockVerifyScreen(
     var patReset   by remember { mutableIntStateOf(0) }
     var errorMsg   by remember { mutableStateOf<String?>(null) }
     var attempts   by remember { mutableIntStateOf(0) }
-    var wipeDialog by remember { mutableStateOf(false) }
+    var securityDialog  by remember { mutableStateOf(false) }
+    var securityAnswer  by remember { mutableStateOf("") }
+    var securityError   by remember { mutableStateOf<String?>(null) }
 
     suspend fun verify(input: String): Boolean {
         val stored = am.getAppLockHash() ?: return false
@@ -167,31 +169,51 @@ fun AppLockVerifyScreen(
 
             Spacer(Modifier.weight(1f))
 
-            TextButton(onClick = { wipeDialog = true }) {
+            TextButton(onClick = { securityDialog = true; securityAnswer = ""; securityError = null }) {
                 Text("I forgot my ${method.replaceFirstChar { it.uppercase() }}",
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 
-    // Wipe dialog
-    if (wipeDialog) {
+    // Security question dialog
+    if (securityDialog) {
         AlertDialog(
-            onDismissRequest = { wipeDialog = false },
-            icon = { Icon(Icons.Filled.Warning, null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("Reset app lock?") },
+            onDismissRequest = { securityDialog = false },
+            icon = { Icon(Icons.Filled.Lock, null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Security Question") },
             text = {
-                Text(
-                    "If you forgot your ${method.replaceFirstChar { it.uppercase() }}, you can disable the app lock. " +
-                    "This will NOT delete your GitHub accounts or settings — only the lock is removed."
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Tell Your Best Friend Name",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold)
+                    OutlinedTextField(
+                        value = securityAnswer,
+                        onValueChange = { securityAnswer = it; securityError = null },
+                        label = { Text("Your answer") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        isError = securityError != null,
+                        supportingText = securityError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } }
+                    )
+                }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    scope.launch { am.clearAppLock(); main.unlock(); wipeDialog = false; onVerified() }
-                }) { Text("Disable lock", color = MaterialTheme.colorScheme.error) }
+                    scope.launch {
+                        val stored = am.getSecurityAnswer()
+                        if (securityAnswer.trim().equals(stored.trim(), ignoreCase = true)) {
+                            am.clearAppLock()
+                            main.unlock()
+                            securityDialog = false
+                            onVerified()
+                        } else {
+                            securityError = "Incorrect answer. Try again."
+                        }
+                    }
+                }) { Text("Confirm") }
             },
-            dismissButton = { TextButton(onClick = { wipeDialog = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { securityDialog = false }) { Text("Cancel") } }
         )
     }
 }
