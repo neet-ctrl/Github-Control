@@ -156,17 +156,17 @@ class GitHubRepository @Inject constructor(
         targetOwner: String,
         targetRepo: String,
         newBranch: String,
-        onProgress: (String) -> Unit = {}
+        onProgress: (String, Float?) -> Unit = { _, _ -> }
     ): GhRef = withContext(Dispatchers.IO) {
 
-        val MAX_COMMITS     = 200
+        val MAX_COMMITS      = 200
         val BLOB_CONCURRENCY = 8
-        val semaphore       = Semaphore(BLOB_CONCURRENCY)
+        val semaphore        = Semaphore(BLOB_CONCURRENCY)
         // source blob SHA → target blob SHA  (avoids re-uploading identical content)
-        val blobCache       = mutableMapOf<String, String>()
+        val blobCache        = mutableMapOf<String, String>()
 
         // ── 1. Collect all commits, oldest-first ─────────────────────────────
-        onProgress("Fetching commit history…")
+        onProgress("Fetching commit history…", null)
         val allCommits = mutableListOf<GhCommit>()
         var page = 1
         while (allCommits.size < MAX_COMMITS) {
@@ -182,7 +182,7 @@ class GitHubRepository @Inject constructor(
         if (allCommits.isEmpty()) error("No commits found on $sourceOwner/$sourceRepo@$sourceBranch")
         allCommits.reverse()                                    // oldest → newest
         val totalCommits = allCommits.size
-        onProgress("Found $totalCommits commit(s) — importing with full history…")
+        onProgress("Found $totalCommits commit(s) — importing with full history…", 0f)
 
         // ── 2. Replay commits one-by-one ─────────────────────────────────────
         var prevSourceTree    = emptyMap<String, GhFileTreeItem>() // path → item
@@ -191,7 +191,8 @@ class GitHubRepository @Inject constructor(
 
         for ((idx, ghCommit) in allCommits.withIndex()) {
             val shortMsg = ghCommit.commit.message.lines().first().take(72)
-            onProgress("Commit ${idx + 1}/$totalCommits: $shortMsg")
+            val fraction = idx.toFloat() / totalCommits
+            onProgress("Commit ${idx + 1}/$totalCommits: $shortMsg", fraction)
 
             // Fetch the full recursive file tree for this commit
             val srcTree = api.gitTree(
@@ -260,7 +261,7 @@ class GitHubRepository @Inject constructor(
         }
 
         // ── 3. Point the branch ref at the final commit ───────────────────────
-        onProgress("Finalising branch ref…")
+        onProgress("Finalising branch ref…", 1f)
         val headSha = prevTargetCommitSha ?: error("Import produced no commits")
         runCatching {
             api.createRef(targetOwner, targetRepo, CreateRefRequest("refs/heads/$newBranch", headSha))

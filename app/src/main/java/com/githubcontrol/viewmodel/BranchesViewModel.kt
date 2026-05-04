@@ -23,11 +23,12 @@ data class BranchesState(
     val deleting: String? = null,
     val settingDefault: String? = null,
     // Live import state mirrored from BranchImportService
-    val importing: Boolean = false,
-    val importPaused: Boolean = false,
-    val importProgress: String? = null,
-    val importResult: String? = null,
-    val importError: String? = null
+    val importing:            Boolean = false,
+    val importPaused:         Boolean = false,
+    val importProgress:       String? = null,
+    val importProgressFraction: Float? = null,
+    val importResult:         String? = null,
+    val importError:          String? = null
 )
 
 @HiltViewModel
@@ -45,11 +46,12 @@ class BranchesViewModel @Inject constructor(
         viewModelScope.launch {
             combine(_local, importService.state) { local, imp ->
                 local.copy(
-                    importing      = imp.active,
-                    importPaused   = imp.paused,
-                    importProgress = imp.progress,
-                    importResult   = imp.lastResult,
-                    importError    = imp.lastError
+                    importing               = imp.active,
+                    importPaused            = imp.paused,
+                    importProgress          = imp.progress,
+                    importProgressFraction  = imp.progressFraction,
+                    importResult            = imp.lastResult,
+                    importError             = imp.lastError
                 )
             }.collect { combined.value = it }
         }

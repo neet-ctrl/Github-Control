@@ -74,7 +74,7 @@ fun BranchesScreen(
                             MaterialTheme.colorScheme.secondaryContainer
                     )
                 ) {
-                    Column(Modifier.padding(12.dp)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -93,23 +93,40 @@ fun BranchesScreen(
                                 s.importProgress ?: if (s.importPaused) "Waiting for network…" else "Importing…",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Medium,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                maxLines = 2
                             )
                             TextButton(onClick = { vm.cancelImport() }) {
                                 Text("Cancel", color = MaterialTheme.colorScheme.error)
                             }
                         }
                         if (!s.importPaused) {
-                            Spacer(Modifier.height(4.dp))
-                            LinearProgressIndicator(Modifier.fillMaxWidth())
-                            Spacer(Modifier.height(4.dp))
+                            val fraction = s.importProgressFraction
+                            if (fraction != null) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    LinearProgressIndicator(
+                                        progress = { fraction },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Text(
+                                        "${(fraction * 100).toInt()}%",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            } else {
+                                LinearProgressIndicator(Modifier.fillMaxWidth())
+                            }
                             Text(
                                 "Import continues even if you navigate to other screens.",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         } else {
-                            Spacer(Modifier.height(4.dp))
                             Text(
                                 "Import is paused. It will resume automatically when the network reconnects.",
                                 style = MaterialTheme.typography.labelSmall,

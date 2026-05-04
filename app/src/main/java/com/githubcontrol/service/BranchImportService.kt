@@ -34,17 +34,18 @@ class BranchImportService @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     data class ImportState(
-        val active:      Boolean = false,
-        val paused:      Boolean = false,
-        val progress:    String? = null,
-        val lastResult:  String? = null,
-        val lastError:   String? = null,
-        val targetOwner: String  = "",
-        val targetRepo:  String  = "",
-        val newBranch:   String  = "",
-        val sourceOwner: String  = "",
-        val sourceRepo:  String  = "",
-        val sourceBranch:String  = ""
+        val active:           Boolean = false,
+        val paused:           Boolean = false,
+        val progress:         String? = null,
+        val progressFraction: Float?  = null,
+        val lastResult:       String? = null,
+        val lastError:        String? = null,
+        val targetOwner:      String  = "",
+        val targetRepo:       String  = "",
+        val newBranch:        String  = "",
+        val sourceOwner:      String  = "",
+        val sourceRepo:       String  = "",
+        val sourceBranch:     String  = ""
     )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -111,9 +112,12 @@ class BranchImportService @Inject constructor(
                         targetOwner  = targetOwner,
                         targetRepo   = targetRepo,
                         newBranch    = newBranch,
-                        onProgress   = { msg ->
+                        onProgress   = { msg, fraction ->
                             ensureActive()
-                            _state.value = _state.value.copy(progress = msg)
+                            _state.value = _state.value.copy(
+                                progress         = msg,
+                                progressFraction = fraction
+                            )
                         }
                     )
                 }
