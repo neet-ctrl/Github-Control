@@ -494,9 +494,11 @@ data class TreeNode(
     val path: String,
     val mode: String = "100644",
     val type: String = "blob",
+    // sha=null signals deletion; @EncodeDefault(ALWAYS) ensures it is always included in the
+    // JSON even when null. We deliberately omit a `content` field — GitHub's createTree API
+    // rejects requests where both sha AND content are present (even as null).
     @EncodeDefault(mode = EncodeDefault.Mode.ALWAYS)
-    val sha: String? = null,
-    val content: String? = null
+    val sha: String? = null
 )
 
 @Serializable

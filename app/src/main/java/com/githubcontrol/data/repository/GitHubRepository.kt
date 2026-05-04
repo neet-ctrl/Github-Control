@@ -190,7 +190,14 @@ class GitHubRepository @Inject constructor(
                                 targetOwner, targetRepo,
                                 CreateBlobRequest(rawContent, "base64")
                             ).sha
-                            TreeNode(path = item.path, mode = item.mode, type = "blob", sha = newSha)
+                            // Normalise mode to the subset GitHub's createTree API accepts.
+                            // Non-standard modes (100664, 100775, etc.) cause HTTP 422.
+                            val safeMode = when (item.mode) {
+                                "100755" -> "100755" // executable
+                                "120000" -> "120000" // symlink
+                                else     -> "100644" // regular file (default)
+                            }
+                            TreeNode(path = item.path, mode = safeMode, type = "blob", sha = newSha)
                         }.getOrElse { err ->
                             val detail = if (err is HttpException)
                                 err.response()?.errorBody()?.string() ?: err.message()
