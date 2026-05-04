@@ -46,8 +46,10 @@ object Routes {
     const val HEALTH = "health"
     const val ONBOARDING = "onboarding"
     const val USER_PROFILE = "user_profile/{login}"
+    const val RELEASES = "releases/{owner}/{name}"
 
     fun repoDetail(owner: String, name: String) = "repo/$owner/$name"
+    fun releases(owner: String, name: String) = "releases/$owner/$name"
     fun files(owner: String, name: String, path: String = "", ref: String = "") =
         "files/$owner/$name?path=${java.net.URLEncoder.encode(path, "UTF-8")}&ref=${java.net.URLEncoder.encode(ref, "UTF-8")}"
     fun preview(owner: String, name: String, path: String, ref: String = "") =

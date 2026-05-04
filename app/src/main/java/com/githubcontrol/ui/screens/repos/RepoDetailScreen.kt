@@ -99,6 +99,7 @@ fun RepoDetailScreen(
                     OutlinedButton(onClick = { onNavigate(Routes.issues(owner, name)) }) { Icon(Icons.Filled.BugReport, null); Spacer(Modifier.width(6.dp)); Text("Issues") }
                     OutlinedButton(onClick = { onNavigate(Routes.actions(owner, name)) }) { Icon(Icons.Filled.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text("Actions") }
                     OutlinedButton(onClick = { onNavigate(Routes.analytics(owner, name)) }) { Icon(Icons.Filled.Analytics, null); Spacer(Modifier.width(6.dp)); Text("Analytics") }
+                    OutlinedButton(onClick = { onNavigate(Routes.releases(owner, name)) }) { Icon(Icons.Filled.NewReleases, null); Spacer(Modifier.width(6.dp)); Text("Releases") }
                     Button(onClick = { onNavigate(Routes.upload(owner, name, "", r.defaultBranch)) }) { Icon(Icons.Filled.Upload, null); Spacer(Modifier.width(6.dp)); Text("Upload") }
                 }
             }

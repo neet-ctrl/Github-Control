@@ -127,6 +127,37 @@ and ZIP-folder download via the Storage Access Framework.
   `UpdateRepoRequest.defaultBranch`. The default branch is also protected
   from accidental deletion.
 
+## Releases feature (May 2026)
+
+- **Releases screen** — new `ReleasesScreen` (+ `ReleasesViewModel`) reachable
+  from the "Releases" button added to `RepoDetailScreen`'s Browse card.
+  Displays every release with: tag name, release title, Draft/Pre-release badges,
+  published date (relative), target commitish, author login, body preview (3 lines),
+  and asset count. Each row has an individual **Delete** button with a confirm dialog.
+- **Bulk delete toolbar** — a `DeleteSweep` icon in the top bar opens a dropdown
+  with seven bulk-delete modes:
+  - **Delete N newest** — deletes the N most-recently published releases (number dialog).
+  - **Delete N oldest** — deletes the N oldest releases (number dialog).
+  - **Delete by date range** — deletes releases published within a YYYY-MM-DD range
+    (two text fields; either bound can be left blank).
+  - **Delete by selection** — toggles a checkbox-selection mode on the list;
+    a trash icon in the top bar fires a confirmation then bulk-deletes checked rows.
+  - **Delete releases after commit…** — loads the last 50 commits into a scrollable
+    picker dialog; the selected commit's author date is the cutoff; releases published
+    *after* that date are deleted.
+  - **Delete releases before commit…** — same picker, deletes releases published
+    *before* the commit's date.
+  - **Delete all releases** — single confirm dialog, deletes everything.
+  All bulk operations run sequentially (one API call per release), show a
+  `LinearProgressIndicator` while in flight, and surface a success banner or
+  per-failure error.
+- **API / model changes** — `GitHubApi.releases()` gains `per_page` + `page` params;
+  new `GitHubApi.deleteRelease()` (`DELETE /repos/{o}/{r}/releases/{id}`);
+  `GitHubRepository.releases()` auto-paginates (100/page) to load all releases;
+  new `GitHubRepository.deleteRelease()`; `GhRelease` gains `targetCommitish`,
+  `author`, and `assets: List<GhReleaseAsset>`; new `GhReleaseAsset` model.
+- **Route** — `Routes.RELEASES` (`releases/{owner}/{name}`) + helper `Routes.releases()`.
+
 ## Latest iteration (Apr 2026)
 
 - **Codespaces from a commit** — `CommitDetailScreen` now embeds a

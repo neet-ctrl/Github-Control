@@ -41,6 +41,7 @@ import com.githubcontrol.ui.screens.plugins.PluginsScreen
 import com.githubcontrol.ui.screens.pulls.CreatePullScreen
 import com.githubcontrol.ui.screens.pulls.PullDetailScreen
 import com.githubcontrol.ui.screens.pulls.PullsScreen
+import com.githubcontrol.ui.screens.releases.ReleasesScreen
 import com.githubcontrol.ui.screens.repos.CreateRepoScreen
 import com.githubcontrol.ui.screens.repos.RepoDetailScreen
 import com.githubcontrol.ui.screens.repos.RepoListScreen
@@ -433,6 +434,19 @@ fun AppRoot() {
                 com.githubcontrol.ui.screens.health.HealthScreen(
                     main = main,
                     uploadManager = um,
+                    onBack = { nav.popBackStack() }
+                )
+            }
+            composable(
+                Routes.RELEASES,
+                arguments = listOf(
+                    navArgument("owner") { type = NavType.StringType },
+                    navArgument("name") { type = NavType.StringType }
+                )
+            ) { back ->
+                ReleasesScreen(
+                    owner = back.arguments?.getString("owner") ?: "",
+                    name = back.arguments?.getString("name") ?: "",
                     onBack = { nav.popBackStack() }
                 )
             }

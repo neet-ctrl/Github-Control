@@ -95,6 +95,24 @@ class GitHubRepository @Inject constructor(
         api.addIssueComment(owner, name, number, CreateCommentRequest(body))
     }
 
+    // ---------- Releases ----------
+    suspend fun releases(owner: String, name: String): List<GhRelease> = withContext(Dispatchers.IO) {
+        val all = mutableListOf<GhRelease>()
+        var page = 1
+        while (true) {
+            val page_releases = api.releases(owner, name, perPage = 100, page = page)
+            all.addAll(page_releases)
+            if (page_releases.size < 100) break
+            page++
+        }
+        all
+    }
+
+    suspend fun deleteRelease(owner: String, name: String, releaseId: Long) = withContext(Dispatchers.IO) {
+        val r = api.deleteRelease(owner, name, releaseId)
+        if (!r.isSuccessful) throw IllegalStateException("Delete release failed: HTTP ${r.code()}")
+    }
+
     suspend fun workflows(owner: String, name: String) = withContext(Dispatchers.IO) { api.workflows(owner, name) }
     suspend fun workflowRuns(owner: String, name: String, page: Int = 1) = withContext(Dispatchers.IO) { api.workflowRuns(owner, name, page = page) }
     suspend fun dispatchWorkflow(owner: String, name: String, id: Long, ref: String, inputs: Map<String, String> = emptyMap()) = withContext(Dispatchers.IO) {

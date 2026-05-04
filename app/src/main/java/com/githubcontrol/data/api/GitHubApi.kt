@@ -253,7 +253,19 @@ interface GitHubApi {
 
     // ---------- Releases ----------
     @GET("repos/{owner}/{repo}/releases")
-    suspend fun releases(@Path("owner") owner: String, @Path("repo") repo: String): List<GhRelease>
+    suspend fun releases(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Query("per_page") perPage: Int = 100,
+        @Query("page") page: Int = 1
+    ): List<GhRelease>
+
+    @DELETE("repos/{owner}/{repo}/releases/{release_id}")
+    suspend fun deleteRelease(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("release_id") releaseId: Long
+    ): Response<Unit>
 
     // ---------- Notifications ----------
     @GET("notifications")

@@ -289,7 +289,23 @@ data class GhRelease(
     val prerelease: Boolean,
     @SerialName("created_at") val createdAt: String,
     @SerialName("published_at") val publishedAt: String? = null,
-    @SerialName("html_url") val htmlUrl: String
+    @SerialName("html_url") val htmlUrl: String,
+    @SerialName("target_commitish") val targetCommitish: String? = null,
+    val author: GhUser? = null,
+    val assets: List<GhReleaseAsset> = emptyList()
+)
+
+@Serializable
+data class GhReleaseAsset(
+    val id: Long,
+    val name: String,
+    val size: Long = 0,
+    @SerialName("content_type") val contentType: String? = null,
+    val state: String? = null,
+    @SerialName("download_count") val downloadCount: Int = 0,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("updated_at") val updatedAt: String,
+    @SerialName("browser_download_url") val browserDownloadUrl: String? = null
 )
 
 @Serializable
