@@ -1,8 +1,12 @@
 package com.githubcontrol.data.repository
 
+import android.content.Context
+import android.net.Uri
+import android.util.Base64
 import com.githubcontrol.data.api.*
 import com.githubcontrol.data.auth.AccountManager
 import com.githubcontrol.utils.Logger
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -11,7 +15,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody
+import okio.BufferedSink
 import retrofit2.HttpException
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,7 +28,8 @@ import javax.inject.Singleton
 @Singleton
 class GitHubRepository @Inject constructor(
     private val client: RetrofitClient,
-    private val accountManager: AccountManager
+    private val accountManager: AccountManager,
+    @ApplicationContext private val context: Context
 ) {
     val api: GitHubApi get() = client.api
 
@@ -376,6 +386,128 @@ class GitHubRepository @Inject constructor(
         ))
         Logger.i("commitFiles", "Updating ref heads/$branch → ${commit.sha}")
         api.updateRef(owner, name, "heads/$branch", UpdateRefRequest(commit.sha, force = true))
+        commit
+    }
+
+    // ---------- Large-file streaming upload ----------
+
+    /**
+     * Creates a Git blob for [uri] using a **streaming** OkHttp request body.
+     *
+     * Unlike [commitFiles] (which base64-encodes the full byte array into a String),
+     * this function pipes the raw bytes through a Base64 encoder directly into the
+     * OkHttp I/O buffer — so the peak heap usage is just one 48 KB chunk at a time
+     * regardless of file size.  This allows uploading files up to GitHub's hard limit
+     * (~100 MB for the Git Blobs API) without triggering OutOfMemoryError on Android.
+     *
+     * @return The SHA-1 of the newly created blob.
+     */
+    suspend fun createBlobStreaming(
+        owner: String,
+        repoName: String,
+        uri: Uri
+    ): String = withContext(Dispatchers.IO) {
+        val token = accountManager.activeToken()
+
+        val streamBody = object : RequestBody() {
+            override fun contentType() = "application/json; charset=utf-8".toMediaType()
+
+            override fun writeTo(sink: BufferedSink) {
+                sink.writeUtf8("{\"encoding\":\"base64\",\"content\":\"")
+                val input = context.contentResolver.openInputStream(uri)
+                    ?: throw IOException("Cannot open URI for streaming: $uri")
+                // Read in 48 KB chunks (exactly divisible by 3) so each intermediate
+                // flush produces clean base64 output with no intra-stream padding.
+                val accumulator = ByteArray(3 * 16384) // 48 KB
+                input.use { ins ->
+                    var pending = 0
+                    val readBuf = ByteArray(8 * 1024)
+                    while (true) {
+                        val n = ins.read(readBuf)
+                        if (n < 0) break
+                        var src = 0
+                        while (src < n) {
+                            val copy = minOf(n - src, accumulator.size - pending)
+                            System.arraycopy(readBuf, src, accumulator, pending, copy)
+                            pending += copy
+                            src += copy
+                            if (pending == accumulator.size) {
+                                sink.write(Base64.encode(accumulator, Base64.NO_WRAP))
+                                pending = 0
+                            }
+                        }
+                    }
+                    if (pending > 0) {
+                        sink.write(Base64.encode(accumulator, 0, pending, Base64.NO_WRAP))
+                    }
+                }
+                sink.writeUtf8("\"}")
+            }
+        }
+
+        val request = Request.Builder()
+            .url("https://api.github.com/repos/$owner/$repoName/git/blobs")
+            .post(streamBody)
+            .addHeader("Accept", "application/vnd.github+json")
+            .addHeader("X-GitHub-Api-Version", "2022-11-28")
+            .addHeader("User-Agent", "GitHubControl-Android")
+            .apply { if (!token.isNullOrBlank()) addHeader("Authorization", "Bearer $token") }
+            .build()
+
+        val response = client.rawClient.newCall(request).execute()
+        response.use { resp ->
+            val bodyStr = resp.body?.string()
+                ?: throw IOException("Empty response from blob creation endpoint")
+            if (!resp.isSuccessful)
+                throw IOException("Create blob failed (HTTP ${resp.code}): $bodyStr")
+            client.json.decodeFromString<GhBlob>(bodyStr).sha
+        }
+    }
+
+    /**
+     * Uploads a single file to [branch] using the Git Data API with a streaming blob.
+     *
+     * This is the fallback path for files that are too large for the Contents API
+     * (`PUT /repos/{owner}/{repo}/contents/{path}` is limited to ~100 MB and requires
+     * the full base64 payload in memory).  This method:
+     *   1. Creates a blob via [createBlobStreaming] — no OOM even for 200 MB files.
+     *   2. Creates a new tree that inherits the branch's existing files via `base_tree`.
+     *   3. Creates a commit and updates the branch ref atomically.
+     *
+     * Because [runJob] in [UploadManager] processes files sequentially, each call here
+     * parents off the live HEAD so commits chain correctly.
+     */
+    suspend fun commitSingleLargeFile(
+        owner: String,
+        repoName: String,
+        branch: String,
+        targetPath: String,
+        uri: Uri,
+        message: String,
+        authorName: String? = null,
+        authorEmail: String? = null
+    ): GhCommit = withContext(Dispatchers.IO) {
+        val blobSha      = createBlobStreaming(owner, repoName, uri)
+        val branchInfo   = api.branch(owner, repoName, branch)
+        val parentSha    = branchInfo.commit.sha
+        val parentCommit = api.commitDetail(owner, repoName, parentSha)
+        val baseTreeSha  = parentCommit.commit.tree.sha
+
+        val treeNode = TreeNode(path = targetPath, mode = "100644", type = "blob", sha = blobSha)
+        val tree     = api.createTree(owner, repoName,
+            CreateTreeRequest(baseTree = baseTreeSha, tree = listOf(treeNode)))
+
+        val author = if (authorName != null && authorEmail != null)
+            GhCommitAuthor(authorName, authorEmail, java.time.Instant.now().toString()) else null
+        val commit = api.createCommit(owner, repoName, CreateCommitRequest(
+            message   = message,
+            tree      = tree.sha,
+            parents   = listOf(parentSha),
+            author    = author,
+            committer = author
+        ))
+        Logger.i("LargeUpload", "Committed $targetPath via streaming blob → ${commit.sha}")
+        api.updateRef(owner, repoName, "heads/$branch", UpdateRefRequest(commit.sha, force = true))
         commit
     }
 

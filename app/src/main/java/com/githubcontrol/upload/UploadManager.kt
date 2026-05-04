@@ -156,52 +156,125 @@ class UploadManager @Inject constructor(
             }
         }
 
+        // Files larger than this threshold skip the Contents API entirely and go
+        // straight to the Git Blobs API via streaming (no full base64 String in heap).
+        val LARGE_FILE_THRESHOLD = 50L * 1024 * 1024 // 50 MB
+
         for (uf in job.files) {
             if (cancelled) { Logger.w("Upload", "cancelled at ${uf.targetPath}"); break }
             while (paused && !cancelled) Thread.sleep(150)
             uf.state = UploadFileState.UPLOADING
             _state.value = _state.value.copy(currentFile = uf.targetPath, files = job.files.toList())
+
+            // ── Dry-run (preview only) ───────────────────────────────────────────
+            if (job.dryRun) {
+                Logger.d("Upload", "PREVIEW ${uf.targetPath} (${uf.sizeBytes}B)")
+                uf.state = UploadFileState.DONE
+                uf.bytesDone = uf.sizeBytes
+                bytesDone += uf.sizeBytes
+                done++
+                _state.value = _state.value.copy(files = job.files.toList(), uploaded = done, bytesDone = bytesDone)
+                continue
+            }
+
+            // ── Conflict resolution ─────────────────────────────────────────────
+            // Resolve path/sha BEFORE the upload attempt so the large-file fallback
+            // path can reuse finalPath without re-fetching.
+            var finalPath = uf.targetPath
+            var targetSha: String? = null
             try {
-                if (job.dryRun) {
-                    Logger.d("Upload", "PREVIEW ${uf.targetPath} (${uf.sizeBytes}B)")
-                    // Preview-only: do not contact the API, just mark the file as resolved.
-                    uf.state = UploadFileState.DONE
-                    uf.bytesDone = uf.sizeBytes
-                    bytesDone += uf.sizeBytes
-                    done++
-                    _state.value = _state.value.copy(files = job.files.toList(), uploaded = done, bytesDone = bytesDone)
-                    continue
-                }
                 if (job.conflictMode == ConflictMode.SKIP) {
                     val exists = runCatching { repo.fileContent(job.owner, job.repo, uf.targetPath, job.branch) }.isSuccess
                     if (exists) { uf.state = UploadFileState.SKIPPED; done++; continue }
                 }
-                val targetSha = if (job.conflictMode == ConflictMode.OVERWRITE) {
+                targetSha = if (job.conflictMode == ConflictMode.OVERWRITE) {
                     runCatching { repo.fileContent(job.owner, job.repo, uf.targetPath, job.branch).sha }.getOrNull()
                 } else null
-                val finalPath = if (job.conflictMode == ConflictMode.RENAME) renameIfExists(job.owner, job.repo, uf.targetPath, job.branch) else uf.targetPath
-
-                val b64 = streamBase64(Uri.parse(uf.id)) ?: throw IllegalStateException("Cannot read")
-                val req = PutFileRequest(
-                    message = job.message,
-                    content = b64,
-                    sha = targetSha,
-                    branch = job.branch,
-                    author = if (job.authorName != null && job.authorEmail != null)
-                        com.githubcontrol.data.api.GhCommitAuthor(job.authorName, job.authorEmail, java.time.Instant.now().toString()) else null,
-                    committer = if (job.authorName != null && job.authorEmail != null)
-                        com.githubcontrol.data.api.GhCommitAuthor(job.authorName, job.authorEmail, java.time.Instant.now().toString()) else null,
-                )
-                repo.api.putFile(job.owner, job.repo, finalPath, req)
-                uf.state = UploadFileState.DONE
-                uf.bytesDone = uf.sizeBytes
-                bytesDone += uf.sizeBytes
-                Logger.i("Upload", "OK   $finalPath  ${uf.sizeBytes}B")
+                finalPath = if (job.conflictMode == ConflictMode.RENAME)
+                    renameIfExists(job.owner, job.repo, uf.targetPath, job.branch)
+                else uf.targetPath
             } catch (t: Throwable) {
                 uf.state = UploadFileState.FAILED
                 uf.error = t.message
-                Logger.e("Upload", "FAIL ${uf.targetPath}", t)
+                Logger.e("Upload", "FAIL (conflict-check) ${uf.targetPath}", t)
+                done++
+                _state.value = _state.value.copy(files = job.files.toList(), uploaded = done, bytesDone = bytesDone)
+                continue
             }
+
+            // ── Upload ─────────────────────────────────────────────────────────
+            // Files ≥ 50 MB: use Git Blobs API with streaming body (no OOM).
+            // Files < 50 MB: use Contents API; fall back to streaming on OOM/413.
+            val isLargeFile = uf.sizeBytes >= LARGE_FILE_THRESHOLD
+            var uploadError: Throwable? = null
+
+            if (!isLargeFile) {
+                try {
+                    val b64 = streamBase64(Uri.parse(uf.id), uf.sizeBytes)
+                        ?: throw IllegalStateException("Cannot read ${uf.targetPath}")
+                    val req = PutFileRequest(
+                        message = job.message,
+                        content = b64,
+                        sha = targetSha,
+                        branch = job.branch,
+                        author = if (job.authorName != null && job.authorEmail != null)
+                            com.githubcontrol.data.api.GhCommitAuthor(job.authorName, job.authorEmail, java.time.Instant.now().toString()) else null,
+                        committer = if (job.authorName != null && job.authorEmail != null)
+                            com.githubcontrol.data.api.GhCommitAuthor(job.authorName, job.authorEmail, java.time.Instant.now().toString()) else null,
+                    )
+                    repo.api.putFile(job.owner, job.repo, finalPath, req)
+                    uf.state = UploadFileState.DONE
+                    uf.bytesDone = uf.sizeBytes
+                    bytesDone += uf.sizeBytes
+                    Logger.i("Upload", "OK   $finalPath  ${uf.sizeBytes}B")
+                } catch (t: Throwable) {
+                    uploadError = t
+                    Logger.w("Upload", "Contents API failed for ${uf.targetPath}: ${t.javaClass.simpleName}: ${t.message}")
+                }
+            }
+
+            // Trigger streaming path for:
+            //   • Files that were already identified as large (≥ 50 MB)
+            //   • Files that failed with OOM / allocation error / HTTP 413
+            val needStreaming = isLargeFile || run {
+                val err = uploadError ?: return@run false
+                val isOom = err is OutOfMemoryError ||
+                    err.cause is OutOfMemoryError ||
+                    err.message?.contains("allocation", ignoreCase = true) == true ||
+                    err.message?.contains("OutOfMemory", ignoreCase = true) == true
+                val isPayloadTooLarge = err is retrofit2.HttpException && err.code() == 413
+                isOom || isPayloadTooLarge
+            }
+
+            if (needStreaming && uf.state != UploadFileState.DONE) {
+                Logger.i("Upload", "${if (isLargeFile) "Large file" else "OOM retry"}: streaming ${uf.targetPath} (${uf.sizeBytes}B) via Git Blobs API")
+                try {
+                    repo.commitSingleLargeFile(
+                        owner       = job.owner,
+                        repoName    = job.repo,
+                        branch      = job.branch,
+                        targetPath  = finalPath,
+                        uri         = Uri.parse(uf.id),
+                        message     = job.message,
+                        authorName  = job.authorName,
+                        authorEmail = job.authorEmail
+                    )
+                    uf.state     = UploadFileState.DONE
+                    uf.bytesDone = uf.sizeBytes
+                    bytesDone   += uf.sizeBytes
+                    Logger.i("Upload", "OK (streaming) $finalPath  ${uf.sizeBytes}B")
+                } catch (retry: Throwable) {
+                    uf.state = UploadFileState.FAILED
+                    uf.error = retry.message
+                    Logger.e("Upload", "FAIL (streaming) ${uf.targetPath}", retry)
+                }
+            } else if (uploadError != null && uf.state != UploadFileState.DONE) {
+                // Small file that failed for a non-OOM reason — report the original error
+                uf.state = UploadFileState.FAILED
+                uf.error = uploadError.message
+                Logger.e("Upload", "FAIL ${uf.targetPath}", uploadError)
+            }
+
             done++
             val elapsed = (System.currentTimeMillis() - start) / 1000.0
             val rate = if (elapsed > 0) bytesDone / elapsed else 0.0
@@ -262,13 +335,24 @@ class UploadManager @Inject constructor(
 
     /**
      * Stream the URI through a Base64 encoder so we never hold the raw bytes and
-     * the encoded string in memory at the same time. Required to avoid OOM on
-     * large uploads (the GitHub Contents API takes base64-encoded content).
+     * the encoded string in memory at the same time.
+     *
+     * [fileSizeBytes] is used to pre-size the [ByteArrayOutputStream] to the exact
+     * base64 output length, avoiding the internal buffer-doubling that would otherwise
+     * waste up to 2× the encoded size in heap.  Pass -1 if size is unknown.
+     *
+     * NOTE: For files ≥ 50 MB use [GitHubRepository.commitSingleLargeFile] instead,
+     * which streams directly into the OkHttp socket and avoids holding any String in memory.
      */
-    private fun streamBase64(uri: Uri): String? {
+    private fun streamBase64(uri: Uri, fileSizeBytes: Long = -1): String? {
         val input = context.contentResolver.openInputStream(uri) ?: return null
+        // ceil(n/3)*4 gives exact base64 output byte count; pre-size to avoid growth copies.
+        val exactSize = if (fileSizeBytes > 0)
+            ((fileSizeBytes / 3 + 1) * 4).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        else
+            65536
         return input.use { ins ->
-            val baos = ByteArrayOutputStream()
+            val baos = ByteArrayOutputStream(exactSize)
             Base64OutputStream(baos, Base64.NO_WRAP).use { b64 ->
                 val buf = ByteArray(64 * 1024)
                 while (true) {

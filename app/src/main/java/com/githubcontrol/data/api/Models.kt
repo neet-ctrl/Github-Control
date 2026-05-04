@@ -492,11 +492,16 @@ data class CreateTreeRequest(@SerialName("base_tree") val baseTree: String? = nu
 @OptIn(ExperimentalSerializationApi::class)
 data class TreeNode(
     val path: String,
+    // @EncodeDefault(ALWAYS) is required on all fields that have default values because
+    // the global Json instance has encodeDefaults=false (the kotlinx.serialization default).
+    // Without this annotation, fields equal to their default are silently omitted from the
+    // JSON body, causing GitHub's createTree API to return HTTP 422
+    // "Must supply a valid tree.mode".
+    @EncodeDefault(mode = EncodeDefault.Mode.ALWAYS)
     val mode: String = "100644",
+    @EncodeDefault(mode = EncodeDefault.Mode.ALWAYS)
     val type: String = "blob",
-    // sha=null signals deletion; @EncodeDefault(ALWAYS) ensures it is always included in the
-    // JSON even when null. We deliberately omit a `content` field — GitHub's createTree API
-    // rejects requests where both sha AND content are present (even as null).
+    // sha=null signals deletion; always included so GitHub knows this is an explicit null.
     @EncodeDefault(mode = EncodeDefault.Mode.ALWAYS)
     val sha: String? = null
 )
