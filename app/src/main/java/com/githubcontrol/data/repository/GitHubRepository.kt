@@ -2,6 +2,7 @@ package com.githubcontrol.data.repository
 
 import com.githubcontrol.data.api.*
 import com.githubcontrol.data.auth.AccountManager
+import com.githubcontrol.utils.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
