@@ -566,8 +566,9 @@ fun SshKeysScreen(onBack: () -> Unit, vm: SshKeysViewModel = hiltViewModel()) {
     // ---- Add key dialog ----
     if (showAdd) {
         val autoTitle = "Key #${s.keys.size + 1}"
+        var submitting by remember { mutableStateOf(false) }
         AlertDialog(
-            onDismissRequest = { showAdd = false; titleField = ""; keyField = "" },
+            onDismissRequest = { if (!submitting) { showAdd = false; titleField = ""; keyField = "" } },
             icon = { Icon(Icons.Filled.Key, null) },
             title = { Text("Add SSH Key") },
             text = {
@@ -586,26 +587,29 @@ fun SshKeysScreen(onBack: () -> Unit, vm: SshKeysViewModel = hiltViewModel()) {
                         label = { Text("Public key (ssh-rsa AAAA…)") },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp)
                     )
-                    if (s.saving) {
+                    if (submitting) {
                         LinearProgressIndicator(Modifier.fillMaxWidth())
                     }
                 }
             },
             confirmButton = {
                 TextButton(
-                    enabled = keyField.isNotBlank() && !s.saving,
+                    enabled = keyField.isNotBlank() && !submitting,
                     onClick = {
+                        submitting = true
                         val resolvedTitle = titleField.ifBlank { autoTitle }
                         vm.add(resolvedTitle, keyField) {
+                            submitting = false
                             showAdd = false; titleField = ""; keyField = ""
                         }
                     }
                 ) { Text("Add") }
             },
             dismissButton = {
-                TextButton(onClick = { showAdd = false; titleField = ""; keyField = "" }) {
-                    Text("Cancel")
-                }
+                TextButton(
+                    enabled = !submitting,
+                    onClick = { showAdd = false; titleField = ""; keyField = "" }
+                ) { Text("Cancel") }
             }
         )
     }
