@@ -296,7 +296,7 @@ fun GitHubCommandsScreen(
                             tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )
                         Text(
-                            "No commands match "${s.filter}"",
+                            "No commands match \"${s.filter}\"",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -758,7 +758,7 @@ private fun SnippetsTabContent(
                 Icon(Icons.Filled.SearchOff, null,
                     modifier = Modifier.size(48.dp),
                     tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-                Text("No snippets match "$filter"",
+                Text("No snippets match \"$filter\"",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
