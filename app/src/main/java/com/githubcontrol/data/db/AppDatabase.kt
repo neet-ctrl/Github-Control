@@ -23,7 +23,7 @@ data class UploadHistoryEntity(
     val totalFiles: Int,
     val totalBytes: Long,
     val message: String,
-    val state: String, // pending|uploading|paused|failed|completed
+    val state: String,
     val ts: Long = System.currentTimeMillis()
 )
 
@@ -51,6 +51,21 @@ data class DownloadEntity(
     val sizeBytes: Long,
     val ts: Long = System.currentTimeMillis()
 )
+
+/** User-saved custom commands — global or scoped to a specific repo. */
+@Entity(tableName = "snippets")
+data class SnippetEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val label: String,
+    val command: String,
+    val description: String = "",
+    /** null  = global snippet; non-null = repo-specific */
+    val owner: String? = null,
+    val repo: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+// ─── DAOs ────────────────────────────────────────────────────────────────────
 
 @Dao
 interface CommandHistoryDao {
@@ -83,13 +98,45 @@ interface DownloadDao {
     @Query("DELETE FROM downloads") suspend fun clear()
 }
 
+@Dao
+interface SnippetDao {
+    @Query("SELECT * FROM snippets ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<SnippetEntity>>
+
+    /** Global + repo-specific snippets for one repo. */
+    @Query("""
+        SELECT * FROM snippets
+        WHERE (owner = :o AND repo = :r) OR (owner IS NULL AND repo IS NULL)
+        ORDER BY owner IS NULL, createdAt DESC
+    """)
+    fun observeForRepo(o: String, r: String): Flow<List<SnippetEntity>>
+
+    @Query("SELECT * FROM snippets WHERE owner IS NULL AND repo IS NULL ORDER BY createdAt DESC")
+    fun observeGlobal(): Flow<List<SnippetEntity>>
+
+    @Insert  suspend fun insert(e: SnippetEntity): Long
+    @Update  suspend fun update(e: SnippetEntity)
+    @Delete  suspend fun delete(e: SnippetEntity)
+    @Query("DELETE FROM snippets WHERE id = :id") suspend fun deleteById(id: Long)
+}
+
+// ─── Database ─────────────────────────────────────────────────────────────────
+
 @Database(
-    entities = [CommandHistoryEntity::class, UploadHistoryEntity::class, SyncJobEntity::class, DownloadEntity::class],
-    version = 1, exportSchema = false
+    entities = [
+        CommandHistoryEntity::class,
+        UploadHistoryEntity::class,
+        SyncJobEntity::class,
+        DownloadEntity::class,
+        SnippetEntity::class
+    ],
+    version = 2,
+    exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun commandHistory(): CommandHistoryDao
     abstract fun uploadHistory(): UploadHistoryDao
     abstract fun syncJobs(): SyncJobDao
     abstract fun downloads(): DownloadDao
+    abstract fun snippets(): SnippetDao
 }

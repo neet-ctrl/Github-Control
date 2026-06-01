@@ -23,24 +23,32 @@ import com.githubcontrol.ui.components.QrDialog
 import com.githubcontrol.ui.navigation.Routes
 import com.githubcontrol.utils.ByteFormat
 import com.githubcontrol.utils.ShareUtils
+import com.githubcontrol.data.db.SnippetEntity
+import com.githubcontrol.ui.screens.commands.SnippetFormDialog
 import com.githubcontrol.viewmodel.MainViewModel
 import com.githubcontrol.viewmodel.RepoActionsViewModel
+import com.githubcontrol.viewmodel.SnippetsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun RepoDetailScreen(
     owner: String, name: String, main: MainViewModel,
     onBack: () -> Unit, onNavigate: (String) -> Unit,
-    vm: RepoActionsViewModel = hiltViewModel()
+    vm:   RepoActionsViewModel = hiltViewModel(),
+    svVm: SnippetsViewModel    = hiltViewModel()
 ) {
     LaunchedEffect(owner, name) { vm.load(owner, name) }
     val s by vm.state.collectAsState()
     val dangerousMode by main.accountManager.dangerousModeFlow.collectAsState(initial = false)
-    var showRename by remember { mutableStateOf(false) }
-    var showDelete by remember { mutableStateOf(false) }
-    var showTransfer by remember { mutableStateOf(false) }
-    var showQr by remember { mutableStateOf(false) }
+    var showRename       by remember { mutableStateOf(false) }
+    var showDelete       by remember { mutableStateOf(false) }
+    var showTransfer     by remember { mutableStateOf(false) }
+    var showQr           by remember { mutableStateOf(false) }
+    var showAddSnippet   by remember { mutableStateOf(false) }
+    var editingSnippet   by remember { mutableStateOf<SnippetEntity?>(null) }
     val ctx = LocalContext.current
+    val repoSnippets by remember(owner, name) { svVm.forRepo(owner, name) }
+        .collectAsState(initial = emptyList())
 
     Scaffold(
         topBar = {
@@ -180,6 +188,14 @@ fun RepoDetailScreen(
 
             GitCommandsCard(owner = owner, name = name, defaultBranch = r.defaultBranch, ctx = ctx)
 
+            RepoSnippetsCard(
+                snippets        = repoSnippets,
+                onCopy          = { sn -> ShareUtils.copyToClipboard(ctx, sn.command, sn.label) },
+                onEdit          = { sn -> editingSnippet = sn },
+                onDelete        = { sn -> svVm.delete(sn) },
+                onAddForRepo    = { showAddSnippet = true }
+            )
+
             // Danger zone — always shown. Delete itself is gated by typing the repo name in the
             // confirm dialog, so an explicit "dangerous mode" toggle is no longer required.
             GhCard {
@@ -245,6 +261,34 @@ fun RepoDetailScreen(
                 TextButton(onClick = { vm.delete(typed) { ok -> showDelete = false; if (ok) onBack() } }) { Text("Delete forever", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = { TextButton(onClick = { showDelete = false }) { Text("Cancel") } }
+        )
+    }
+
+    // ── Add snippet scoped to this repo (simplified — no repo picker needed) ──
+    if (showAddSnippet) {
+        AddRepoSnippetDialog(
+            owner     = owner,
+            repo      = name,
+            onSave    = { label, command, desc -> svVm.save(label, command, desc, owner, name) },
+            onDismiss = { showAddSnippet = false }
+        )
+    }
+
+    // ── Edit existing snippet ─────────────────────────────────────────────────
+    editingSnippet?.let { sn ->
+        SnippetFormDialog(
+            initialLabel       = sn.label,
+            initialCommand     = sn.command,
+            initialDescription = sn.description,
+            initialOwner       = sn.owner,
+            initialRepo        = sn.repo,
+            existingId         = sn.id,
+            repos              = emptyList(),
+            onSave             = { label, command, desc, snOwner, snRepo ->
+                svVm.update(sn.copy(label = label, command = command, description = desc, owner = snOwner, repo = snRepo))
+            },
+            onDelete           = { svVm.delete(sn) },
+            onDismiss          = { editingSnippet = null }
         )
     }
 }
@@ -479,6 +523,266 @@ private fun GitCommandEditDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Repo Snippets card
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun RepoSnippetsCard(
+    snippets:     List<SnippetEntity>,
+    onCopy:       (SnippetEntity) -> Unit,
+    onEdit:       (SnippetEntity) -> Unit,
+    onDelete:     (SnippetEntity) -> Unit,
+    onAddForRepo: () -> Unit
+) {
+    GhCard {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(Icons.Filled.Bookmark, null,
+                tint     = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp))
+            Text(
+                "Snippets",
+                style      = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier   = Modifier.weight(1f)
+            )
+            if (snippets.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        "${snippets.size}",
+                        style    = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        color    = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Your saved commands for this repo + global snippets.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(10.dp))
+
+        if (snippets.isEmpty()) {
+            Surface(
+                shape    = RoundedCornerShape(10.dp),
+                color    = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "No snippets yet. Tap + to add one, or save any command from the Git Commands screen.",
+                    style    = MaterialTheme.typography.bodySmall,
+                    color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        } else {
+            snippets.forEachIndexed { idx, sn ->
+                RepoSnippetRow(
+                    sn       = sn,
+                    onCopy   = { onCopy(sn) },
+                    onEdit   = { onEdit(sn) },
+                    onDelete = { onDelete(sn) }
+                )
+                if (idx < snippets.lastIndex) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 1.dp),
+                        color    = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+        }
+
+        OutlinedButton(
+            onClick  = onAddForRepo,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Filled.Add, null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Add snippet for this repo")
+        }
+    }
+}
+
+@Composable
+private fun RepoSnippetRow(
+    sn: SnippetEntity,
+    onCopy: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Scope badge
+        Surface(
+            shape = MaterialTheme.shapes.extraSmall,
+            color = if (sn.owner == null) MaterialTheme.colorScheme.primaryContainer
+                    else                   MaterialTheme.colorScheme.tertiaryContainer,
+            modifier = Modifier.size(28.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    if (sn.owner == null) Icons.Filled.Public else Icons.Filled.Folder,
+                    null,
+                    modifier = Modifier.size(14.dp),
+                    tint     = if (sn.owner == null) MaterialTheme.colorScheme.onPrimaryContainer
+                               else                   MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                sn.label,
+                style      = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines   = 1,
+                overflow   = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                sn.command,
+                style      = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color      = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines   = 1,
+                overflow   = TextOverflow.Ellipsis
+            )
+        }
+        IconButton(onClick = onCopy) {
+            Icon(Icons.Filled.ContentCopy, "Copy",
+                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        }
+        IconButton(onClick = onEdit) {
+            Icon(Icons.Filled.Edit, "Edit",
+                tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
+        }
+        IconButton(onClick = { showDeleteConfirm = true }) {
+            Icon(Icons.Filled.Delete, "Delete",
+                tint     = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                modifier = Modifier.size(18.dp))
+        }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title   = { Text("Delete snippet?") },
+            text    = { Text("\"${sn.label}\" will be permanently removed.") },
+            confirmButton = {
+                TextButton(onClick = { onDelete(); showDeleteConfirm = false }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Keep") }
+            }
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Add-snippet dialog (repo-scoped, no repo picker needed)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun AddRepoSnippetDialog(
+    owner: String,
+    repo: String,
+    onSave: (label: String, command: String, description: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var label       by remember { mutableStateOf("") }
+    var command     by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon  = { Icon(Icons.Filled.Bookmark, null) },
+        title = { Text("Add snippet for $owner/$repo") },
+        text  = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                Surface(
+                    shape    = RoundedCornerShape(8.dp),
+                    color    = MaterialTheme.colorScheme.tertiaryContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Filled.Folder, null,
+                            modifier = Modifier.size(14.dp),
+                            tint     = MaterialTheme.colorScheme.onTertiaryContainer)
+                        Text("Saved to: $owner/$repo",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer)
+                    }
+                }
+                OutlinedTextField(
+                    value         = label,
+                    onValueChange = { label = it },
+                    singleLine    = true,
+                    label         = { Text("Label *") },
+                    modifier      = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value         = command,
+                    onValueChange = { command = it },
+                    label         = { Text("Command *") },
+                    leadingIcon   = { Icon(Icons.Filled.Terminal, null, modifier = Modifier.size(18.dp)) },
+                    textStyle     = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace, fontSize = 11.sp
+                    ),
+                    minLines      = 2,
+                    maxLines      = 5,
+                    modifier      = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value         = description,
+                    onValueChange = { description = it },
+                    singleLine    = true,
+                    label         = { Text("Description (optional)") },
+                    modifier      = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick  = { onSave(label.trim(), command.trim(), description.trim()); onDismiss() },
+                enabled  = label.isNotBlank() && command.isNotBlank()
+            ) {
+                Icon(Icons.Filled.Bookmark, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
 }

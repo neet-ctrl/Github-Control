@@ -20,8 +20,9 @@ object AppModule {
             .fallbackToDestructiveMigration()
             .build()
 
-    @Provides fun provideCommandDao(db: AppDatabase) = db.commandHistory()
-    @Provides fun provideUploadDao(db: AppDatabase) = db.uploadHistory()
-    @Provides fun provideSyncDao(db: AppDatabase) = db.syncJobs()
+    @Provides fun provideCommandDao(db: AppDatabase)  = db.commandHistory()
+    @Provides fun provideUploadDao(db: AppDatabase)   = db.uploadHistory()
+    @Provides fun provideSyncDao(db: AppDatabase)     = db.syncJobs()
     @Provides fun provideDownloadDao(db: AppDatabase) = db.downloads()
+    @Provides fun provideSnippetDao(db: AppDatabase)  = db.snippets()
 }
