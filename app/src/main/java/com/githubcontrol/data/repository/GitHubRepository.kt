@@ -133,6 +133,34 @@ class GitHubRepository @Inject constructor(
 
     suspend fun workflows(owner: String, name: String) = withContext(Dispatchers.IO) { api.workflows(owner, name) }
     suspend fun workflowRuns(owner: String, name: String, page: Int = 1) = withContext(Dispatchers.IO) { api.workflowRuns(owner, name, page = page) }
+
+    suspend fun allWorkflowRuns(owner: String, name: String): List<com.githubcontrol.data.api.GhWorkflowRun> = withContext(Dispatchers.IO) {
+        val all = mutableListOf<com.githubcontrol.data.api.GhWorkflowRun>()
+        var page = 1
+        while (true) {
+            val resp = api.workflowRuns(owner, name, perPage = 100, page = page)
+            all += resp.runs
+            if (resp.runs.size < 100) break
+            page++
+        }
+        all
+    }
+
+    suspend fun deleteWorkflowRun(owner: String, name: String, runId: Long) = withContext(Dispatchers.IO) {
+        val r = api.deleteWorkflowRun(owner, name, runId)
+        if (!r.isSuccessful) throw IllegalStateException("Delete run failed: HTTP ${r.code()}")
+    }
+
+    suspend fun cancelWorkflowRun(owner: String, name: String, runId: Long) = withContext(Dispatchers.IO) {
+        val r = api.cancelWorkflowRun(owner, name, runId)
+        if (!r.isSuccessful) throw IllegalStateException("Cancel run failed: HTTP ${r.code()}")
+    }
+
+    suspend fun rerunWorkflowRun(owner: String, name: String, runId: Long) = withContext(Dispatchers.IO) {
+        val r = api.rerunWorkflowRun(owner, name, runId)
+        if (!r.isSuccessful) throw IllegalStateException("Re-run failed: HTTP ${r.code()}")
+    }
+
     suspend fun dispatchWorkflow(owner: String, name: String, id: Long, ref: String, inputs: Map<String, String> = emptyMap()) = withContext(Dispatchers.IO) {
         api.dispatchWorkflow(owner, name, id, mapOf("ref" to ref, "inputs" to inputs))
     }

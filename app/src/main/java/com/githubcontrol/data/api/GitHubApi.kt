@@ -254,6 +254,15 @@ interface GitHubApi {
     @GET("repos/{owner}/{repo}/actions/runs/{run_id}/logs")
     suspend fun workflowRunLogs(@Path("owner") owner: String, @Path("repo") repo: String, @Path("run_id") runId: Long): Response<okhttp3.ResponseBody>
 
+    @DELETE("repos/{owner}/{repo}/actions/runs/{run_id}")
+    suspend fun deleteWorkflowRun(@Path("owner") owner: String, @Path("repo") repo: String, @Path("run_id") runId: Long): Response<Unit>
+
+    @POST("repos/{owner}/{repo}/actions/runs/{run_id}/cancel")
+    suspend fun cancelWorkflowRun(@Path("owner") owner: String, @Path("repo") repo: String, @Path("run_id") runId: Long): Response<Unit>
+
+    @POST("repos/{owner}/{repo}/actions/runs/{run_id}/rerun")
+    suspend fun rerunWorkflowRun(@Path("owner") owner: String, @Path("repo") repo: String, @Path("run_id") runId: Long): Response<Unit>
+
     // ---------- Releases ----------
     @GET("repos/{owner}/{repo}/releases")
     suspend fun releases(
