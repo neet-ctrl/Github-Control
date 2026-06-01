@@ -1,5 +1,6 @@
 package com.githubcontrol.ui.screens.keys
 
+import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -20,6 +22,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.githubcontrol.data.api.GhSshKey
 import com.githubcontrol.data.repository.GitHubRepository
+import com.githubcontrol.notifications.SshKeyNotificationService
 import com.githubcontrol.ui.components.EmbeddedTerminal
 import com.githubcontrol.ui.components.GhBadge
 import com.githubcontrol.ui.components.GhCard
@@ -198,9 +201,27 @@ class SshKeysViewModel @Inject constructor(private val repo: GitHubRepository) :
 @Composable
 fun SshKeysScreen(onBack: () -> Unit, vm: SshKeysViewModel = hiltViewModel()) {
     val s by vm.state.collectAsState()
-    var showAdd          by remember { mutableStateOf(false) }
-    var titleField       by remember { mutableStateOf("") }
-    var keyField         by remember { mutableStateOf("") }
+    val ctx = LocalContext.current
+
+    // Notification toggle — read from prefs
+    var notifEnabled by remember {
+        mutableStateOf(SshKeyNotificationService.isEnabled(ctx))
+    }
+
+    // Controls for add dialog: reload first, then reveal dialog
+    var pendingAdd      by remember { mutableStateOf(false) }
+    var showAdd         by remember { mutableStateOf(false) }
+    var titleField      by remember { mutableStateOf("") }
+    var keyField        by remember { mutableStateOf("") }
+
+    // When reload triggered by +, open dialog once loading finishes
+    LaunchedEffect(s.loading, pendingAdd) {
+        if (pendingAdd && !s.loading) {
+            pendingAdd = false
+            showAdd    = true
+        }
+    }
+
     var showBulkMenu     by remember { mutableStateOf(false) }
 
     // N-based dialogs
@@ -227,7 +248,7 @@ fun SshKeysScreen(onBack: () -> Unit, vm: SshKeysViewModel = hiltViewModel()) {
             title = {
                 Text(
                     if (s.selectionMode) "${s.selectedIds.size} selected"
-                    else "SSH keys (${s.keys.size})"
+                    else "SSH Keys (${s.keys.size})"
                 )
             },
             navigationIcon = {
@@ -256,8 +277,32 @@ fun SshKeysScreen(onBack: () -> Unit, vm: SshKeysViewModel = hiltViewModel()) {
                         )
                     }
                 } else {
-                    // Add key button
-                    IconButton(onClick = { showAdd = true }) {
+                    // Notification toggle
+                    IconToggleButton(
+                        checked = notifEnabled,
+                        onCheckedChange = { enabled ->
+                            notifEnabled = enabled
+                            if (enabled) SshKeyNotificationService.start(ctx)
+                            else SshKeyNotificationService.stop(ctx)
+                        }
+                    ) {
+                        Icon(
+                            if (notifEnabled) Icons.Filled.Notifications
+                            else Icons.Filled.NotificationsOff,
+                            contentDescription = if (notifEnabled) "Disable SSH notification" else "Enable SSH notification",
+                            tint = if (notifEnabled) MaterialTheme.colorScheme.primary
+                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    // Reload button
+                    IconButton(onClick = { vm.reload() }, enabled = !s.loading) {
+                        Icon(Icons.Filled.Refresh, "Reload SSH keys")
+                    }
+                    // Add key button — reload first, then show dialog
+                    IconButton(onClick = {
+                        pendingAdd = true
+                        vm.reload()
+                    }) {
                         Icon(Icons.Filled.Add, "Add SSH key")
                     }
                     // Bulk delete menu
@@ -527,35 +572,48 @@ fun SshKeysScreen(onBack: () -> Unit, vm: SshKeysViewModel = hiltViewModel()) {
 
     // ---- Add key dialog ----
     if (showAdd) {
+        val autoTitle = "Key #${s.keys.size + 1}"
         AlertDialog(
             onDismissRequest = { showAdd = false; titleField = ""; keyField = "" },
-            title = { Text("Add SSH key") },
+            icon = { Icon(Icons.Filled.Key, null) },
+            title = { Text("Add SSH Key") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        titleField, { titleField = it },
-                        label = { Text("Title") },
+                        value = titleField,
+                        onValueChange = { titleField = it },
+                        label = { Text("Description (optional)") },
+                        placeholder = { Text("Auto: $autoTitle") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        keyField, { keyField = it },
-                        label = { Text("Public key (ssh-rsa AAAAB3…)") },
+                        value = keyField,
+                        onValueChange = { keyField = it },
+                        label = { Text("Public key (ssh-rsa AAAA…)") },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp)
                     )
+                    if (s.saving) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
-                    enabled = titleField.isNotBlank() && keyField.isNotBlank() && !s.saving,
+                    enabled = keyField.isNotBlank() && !s.saving,
                     onClick = {
-                        vm.add(titleField, keyField) {
+                        val resolvedTitle = titleField.ifBlank { autoTitle }
+                        vm.add(resolvedTitle, keyField) {
                             showAdd = false; titleField = ""; keyField = ""
                         }
                     }
                 ) { Text("Add") }
             },
-            dismissButton = { TextButton(onClick = { showAdd = false }) { Text("Cancel") } }
+            dismissButton = {
+                TextButton(onClick = { showAdd = false; titleField = ""; keyField = "" }) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 }
@@ -656,45 +714,36 @@ private fun SshDateRangeDialog(
     onConfirm: (String?, String?) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var fromDate by remember { mutableStateOf("") }
-    var toDate   by remember { mutableStateOf("") }
+    var fromText by remember { mutableStateOf("") }
+    var toText   by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Delete by date range") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    "Keys added within this range will be deleted. Leave a field blank to skip that bound.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text("Delete keys added within the given range (YYYY-MM-DD). Either bound can be left blank.")
                 OutlinedTextField(
-                    value = fromDate,
-                    onValueChange = { fromDate = it },
-                    label = { Text("From date") },
-                    placeholder = { Text("YYYY-MM-DD") },
+                    value = fromText,
+                    onValueChange = { fromText = it },
+                    label = { Text("From (YYYY-MM-DD)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
-                    value = toDate,
-                    onValueChange = { toDate = it },
-                    label = { Text("To date") },
-                    placeholder = { Text("YYYY-MM-DD") },
+                    value = toText,
+                    onValueChange = { toText = it },
+                    label = { Text("To (YYYY-MM-DD)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = {
-                    onConfirm(
-                        fromDate.takeIf { it.isNotBlank() },
-                        toDate.takeIf { it.isNotBlank() }
-                    )
-                }
-            ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            TextButton(onClick = {
+                onConfirm(fromText.ifBlank { null }, toText.ifBlank { null })
+            }) {
+                Text("Delete", color = MaterialTheme.colorScheme.error)
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )

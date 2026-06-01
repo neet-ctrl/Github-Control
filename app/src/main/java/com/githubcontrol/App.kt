@@ -35,6 +35,7 @@ class App : Application(), Configuration.Provider {
             NotificationChannel(NotificationChannels.UPLOAD, "Uploads", NotificationManager.IMPORTANCE_LOW),
             NotificationChannel(NotificationChannels.SYNC, "Sync", NotificationManager.IMPORTANCE_LOW),
             NotificationChannel(NotificationChannels.ALERTS, "Alerts", NotificationManager.IMPORTANCE_DEFAULT),
+            NotificationChannel(NotificationChannels.SSH_KEYS, "SSH Keys", NotificationManager.IMPORTANCE_LOW),
         ).forEach(nm::createNotificationChannel)
     }
 }

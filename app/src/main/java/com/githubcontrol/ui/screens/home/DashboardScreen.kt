@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -60,6 +61,9 @@ fun DashboardScreen(
                             onNavigate(Routes.LOGIN)
                         }
                     )
+                    IconButton(onClick = { onNavigate(Routes.SSH_KEYS) }) {
+                        Icon(Icons.Filled.Key, contentDescription = "SSH Keys")
+                    }
                     IconButton(onClick = { onNavigate(Routes.SEARCH) }) { Icon(Icons.Filled.Search, null) }
                     IconButton(onClick = { onNavigate(Routes.NOTIFICATIONS) }) {
                         BadgedBox(badge = { if (s.unreadNotifications > 0) Badge { Text(s.unreadNotifications.toString()) } }) {

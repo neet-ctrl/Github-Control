@@ -11,6 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.githubcontrol.notifications.DeepLinkBus
 import com.githubcontrol.ui.navigation.Routes
 import com.githubcontrol.ui.screens.accounts.AccountsScreen
 import com.githubcontrol.ui.screens.actions.ActionsScreen
@@ -107,6 +108,13 @@ fun AppRoot() {
         LaunchedEffect(nav) {
             main.accountSwitched.collect {
                 nav.navigate(Routes.DASHBOARD) { popUpTo(0) { inclusive = true } }
+            }
+        }
+
+        LaunchedEffect(nav) {
+            DeepLinkBus.pendingRoute.collect { route ->
+                nav.navigate(Routes.DASHBOARD) { popUpTo(0) { inclusive = true } }
+                nav.navigate(route)
             }
         }
 

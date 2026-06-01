@@ -1,12 +1,17 @@
 package com.githubcontrol
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
+import com.githubcontrol.notifications.DeepLinkBus
+import com.githubcontrol.notifications.SshKeyNotificationService
 import com.githubcontrol.ui.AppRoot
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
 // FragmentActivity (which extends ComponentActivity) is required so that
 // androidx.biometric.BiometricPrompt can attach its dialog fragment for the
@@ -19,8 +24,17 @@ class MainActivity : FragmentActivity() {
         installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        // The whole app theme — including all Settings → Appearance customizations —
-        // is composed inside [AppRoot] so it can react to live preference changes.
+        handleDeepLinkIntent(intent)
         setContent { AppRoot() }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleDeepLinkIntent(intent)
+    }
+
+    private fun handleDeepLinkIntent(intent: Intent?) {
+        val route = intent?.getStringExtra(SshKeyNotificationService.EXTRA_ROUTE) ?: return
+        lifecycleScope.launch { DeepLinkBus.pendingRoute.emit(route) }
     }
 }
