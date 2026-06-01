@@ -68,6 +68,7 @@ class SshKeysViewModel @Inject constructor(private val repo: GitHubRepository) :
             try {
                 repo.addSshKey(title.trim(), body.trim())
                 Logger.i("SshKeys", "added key '${title.trim()}'")
+                state.value = state.value.copy(saving = false)
                 reload(); onDone()
             } catch (t: Throwable) {
                 Logger.e("SshKeys", "add failed", t)
