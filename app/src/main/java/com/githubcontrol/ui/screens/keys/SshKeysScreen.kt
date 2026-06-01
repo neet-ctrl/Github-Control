@@ -209,19 +209,10 @@ fun SshKeysScreen(onBack: () -> Unit, vm: SshKeysViewModel = hiltViewModel()) {
         mutableStateOf(SshKeyNotificationService.isEnabled(ctx))
     }
 
-    // Controls for add dialog: reload first, then reveal dialog
-    var pendingAdd      by remember { mutableStateOf(false) }
-    var showAdd         by remember { mutableStateOf(false) }
-    var titleField      by remember { mutableStateOf("") }
-    var keyField        by remember { mutableStateOf("") }
-
-    // When reload triggered by +, open dialog once loading finishes
-    LaunchedEffect(s.loading, pendingAdd) {
-        if (pendingAdd && !s.loading) {
-            pendingAdd = false
-            showAdd    = true
-        }
-    }
+    // Controls for add dialog
+    var showAdd    by remember { mutableStateOf(false) }
+    var titleField by remember { mutableStateOf("") }
+    var keyField   by remember { mutableStateOf("") }
 
     var showBulkMenu     by remember { mutableStateOf(false) }
 
@@ -299,10 +290,11 @@ fun SshKeysScreen(onBack: () -> Unit, vm: SshKeysViewModel = hiltViewModel()) {
                     IconButton(onClick = { vm.reload() }, enabled = !s.loading) {
                         Icon(Icons.Filled.Refresh, "Reload SSH keys")
                     }
-                    // Add key button — reload first, then show dialog
+                    // Add key button
                     IconButton(onClick = {
-                        pendingAdd = true
-                        vm.reload()
+                        titleField = ""
+                        keyField   = ""
+                        showAdd    = true
                     }) {
                         Icon(Icons.Filled.Add, "Add SSH key")
                     }
