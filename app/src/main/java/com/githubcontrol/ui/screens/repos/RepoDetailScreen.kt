@@ -329,7 +329,7 @@ private fun GitCommandsCard(
             ),
             GitCmd(
                 "Nuke folder & fresh clone",
-                """rm -rf .cache && rm -rf .[!.]* ..?* * 2>/dev/null && git clone https://github.com/$owner/$name.git"""
+                """rm -rf .cache && rm -rf .[!.]* ..?* * 2>/dev/null && git clone https://github.com/$owner/$name.git ."""
             )
         )
     }
