@@ -11,7 +11,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.githubcontrol.ui.components.GhBadge
@@ -176,6 +178,8 @@ fun RepoDetailScreen(
                 }
             }
 
+            GitCommandsCard(owner = owner, name = name, defaultBranch = r.defaultBranch, ctx = ctx)
+
             // Danger zone — always shown. Delete itself is gated by typing the repo name in the
             // confirm dialog, so an explicit "dangerous mode" toggle is no longer required.
             GhCard {
@@ -252,5 +256,229 @@ private fun FlowRowSimple(content: @Composable androidx.compose.foundation.layou
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         content = content
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Git Commands card
+// ─────────────────────────────────────────────────────────────────────────────
+
+private data class GitCmd(val label: String, val command: String)
+
+@Composable
+private fun GitCommandsCard(
+    owner: String,
+    name: String,
+    defaultBranch: String,
+    ctx: android.content.Context
+) {
+    val commands = remember(owner, name, defaultBranch) {
+        listOf(
+            GitCmd("Stage all changes", "git add ."),
+            GitCmd("Commit", """git commit -m "mmm""""),
+            GitCmd("Push to $defaultBranch", "git push origin $defaultBranch"),
+            GitCmd(
+                "Generate SSH key & set remote",
+                """ssh-keygen -t ed25519 -C "your-email@example.com" -f ~/.ssh/id_ed25519 -N "" && cat ~/.ssh/id_ed25519.pub && git remote set-url origin git@github.com:$owner/$name.git"""
+            ),
+            GitCmd(
+                "Nuke folder & fresh clone",
+                """rm -rf .cache && rm -rf .[!.]* ..?* * 2>/dev/null && git clone https://github.com/$owner/$name.git"""
+            )
+        )
+    }
+
+    var editingCmd by remember { mutableStateOf<GitCmd?>(null) }
+
+    GhCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Filled.Terminal,
+                null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text("Git Commands", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Tap copy to copy immediately. Tap edit to customise before copying.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(10.dp))
+
+        commands.forEachIndexed { idx, cmd ->
+            GitCommandRow(
+                cmd        = cmd,
+                onCopy     = { ShareUtils.copyToClipboard(ctx, cmd.command, cmd.label) },
+                onEdit     = { editingCmd = cmd }
+            )
+            if (idx < commands.lastIndex) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 2.dp),
+                    color    = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+            }
+        }
+    }
+
+    editingCmd?.let { cmd ->
+        GitCommandEditDialog(
+            cmd      = cmd,
+            ctx      = ctx,
+            onDismiss = { editingCmd = null }
+        )
+    }
+}
+
+@Composable
+private fun GitCommandRow(
+    cmd: GitCmd,
+    onCopy: () -> Unit,
+    onEdit: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Coloured number badge
+        Surface(
+            shape    = MaterialTheme.shapes.extraSmall,
+            color    = MaterialTheme.colorScheme.secondaryContainer,
+            modifier = Modifier.size(28.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Filled.Code,
+                    null,
+                    modifier = Modifier.size(14.dp),
+                    tint     = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                cmd.label,
+                style      = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                cmd.command,
+                style      = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color      = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines   = 1,
+                overflow   = TextOverflow.Ellipsis
+            )
+        }
+        // Icon-only copy button
+        IconButton(onClick = onCopy) {
+            Icon(
+                Icons.Filled.ContentCopy,
+                contentDescription = "Copy command",
+                tint               = MaterialTheme.colorScheme.primary,
+                modifier           = Modifier.size(20.dp)
+            )
+        }
+        // Icon-only open/edit button
+        IconButton(onClick = onEdit) {
+            Icon(
+                Icons.Filled.Edit,
+                contentDescription = "Edit & copy",
+                tint               = MaterialTheme.colorScheme.secondary,
+                modifier           = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun GitCommandEditDialog(
+    cmd: GitCmd,
+    ctx: android.content.Context,
+    onDismiss: () -> Unit
+) {
+    var text by remember(cmd) { mutableStateOf(cmd.command) }
+    val hasChanges = text != cmd.command
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.Terminal, null) },
+        title = { Text(cmd.label) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Surface(
+                    color  = MaterialTheme.colorScheme.secondaryContainer,
+                    shape  = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "Changes are temporary — the original command is never altered.",
+                        style    = MaterialTheme.typography.labelSmall,
+                        color    = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+                OutlinedTextField(
+                    value         = text,
+                    onValueChange = { text = it },
+                    modifier      = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp),
+                    textStyle     = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace
+                    ),
+                    label         = { Text("Command") }
+                )
+                // Show diff hint only when changed
+                if (hasChanges) {
+                    Text(
+                        "Modified from original",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                // Reset to original
+                if (hasChanges) {
+                    IconButton(onClick = { text = cmd.command }) {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = "Reset to original",
+                            tint               = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier           = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                // Copy edited command
+                FilledIconButton(
+                    onClick = { ShareUtils.copyToClipboard(ctx, text, cmd.label) },
+                    colors  = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Icon(
+                        Icons.Filled.ContentCopy,
+                        contentDescription = "Copy",
+                        modifier           = Modifier.size(18.dp)
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
     )
 }
