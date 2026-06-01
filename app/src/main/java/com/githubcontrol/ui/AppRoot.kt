@@ -366,6 +366,9 @@ fun AppRoot() {
             ) { back ->
                 ReleasesScreen(back.arguments?.getString("owner") ?: "", back.arguments?.getString("name") ?: "", onBack = { nav.popBackStack() })
             }
+            composable(Routes.GH_COMMANDS) {
+                com.githubcontrol.ui.screens.commands.GitHubCommandsScreen(onBack = { nav.popBackStack() })
+            }
         }
     }
 }

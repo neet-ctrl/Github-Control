@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
@@ -49,7 +50,13 @@ fun DashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Dashboard") },
+                title = {
+                    // Tapping the title reloads the dashboard instead of navigating anywhere
+                    Text(
+                        "Dashboard",
+                        modifier = Modifier.clickable { vm.load() }
+                    )
+                },
                 actions = {
                     AccountSwitcher(
                         accounts = authState.accounts,
@@ -61,6 +68,9 @@ fun DashboardScreen(
                             onNavigate(Routes.LOGIN)
                         }
                     )
+                    IconButton(onClick = { onNavigate(Routes.GH_COMMANDS) }) {
+                        Icon(Icons.Filled.Terminal, contentDescription = "Git Commands")
+                    }
                     IconButton(onClick = { onNavigate(Routes.SSH_KEYS) }) {
                         Icon(Icons.Filled.Key, contentDescription = "SSH Keys")
                     }

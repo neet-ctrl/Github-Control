@@ -49,6 +49,7 @@ object Routes {
     const val USER_PROFILE  = "user_profile/{login}"
     const val RELEASES      = "releases/{owner}/{name}"
     const val CACHE         = "cache"
+    const val GH_COMMANDS   = "gh_commands"
 
     fun repoDetail(owner: String, name: String)   = "repo/$owner/$name"
     fun releases(owner: String, name: String)      = "releases/$owner/$name"
